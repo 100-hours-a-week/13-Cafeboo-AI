@@ -73,5 +73,15 @@ def predict_caffeine_limit(request: CaffeineLimitRequest):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=make_response("error", "서버 내부 오류가 발생했습니다.", {}, "resource_exhausted", "컴퓨팅 리소스 부족으로 AI 추론을 완료할 수 없었습니다.")
+            ##detail=make_response("error", "서버 내부 오류가 발생했습니다.", {}, "resource_exhausted", "컴퓨팅 리소스 부족으로 AI 추론을 완료할 수 없었습니다.")
+            
+            detail={
+            "status": "error",
+            "message": "컴퓨팅 리소스 부족으로 AI 추론을 완료할 수 없었습니다.",
+            "data": {
+                "code": "resource_exhausted",
+                "detail": str(e)  # 원래는 숨겨야 하지만 지금은 디버깅용
+            }
+        }
+                
         )
