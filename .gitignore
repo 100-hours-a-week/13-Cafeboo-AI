@@ -46,7 +46,7 @@ logs/
 
 # Model files & Data
 *.h5
-*.pkl
+# *.pkl
 *.model
 data/raw/*
 data/interim/*
