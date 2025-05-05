@@ -5,6 +5,9 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
+import logging
+
+logger = logging.getLogger(__name__)
 
 class PDFProcessingPipeline:
     def __init__(self):
@@ -20,10 +23,14 @@ class PDFProcessingPipeline:
         )
     
     def load_pdf(self, state: Dict) -> Dict:
-        pdf_path = state["pdf_path"]
-        loader = PyPDFLoader(pdf_path)
-        pages = loader.load()
-        return {"pages": pages, **state}
+        try:
+            pdf_path = state["pdf_path"]
+            loader = PyPDFLoader(pdf_path)
+            pages = loader.load()
+            return {"pages": pages, **state}
+        except Exception as e:
+            logger.error(f"Error in load_pdf: {e}", exc_info=True)
+            raise
     
     def split_text(self, state: Dict) -> Dict:
         pages = state["pages"]
@@ -31,26 +38,29 @@ class PDFProcessingPipeline:
         return {"chunks": chunks, **state}
     
     def create_embeddings_and_store(self, state: Dict) -> Dict:
-        chunks = state["chunks"]
-        collection_name = state.get("collection_name", "default_collection")
-        
-        
-        vectorstore = Chroma(
-            embedding_function=self.embeddings,
-            collection_name=collection_name,
-            persist_directory="chroma_db"
-        )
-        
-        if vectorstore._collection.count() == 0:
-            vectorstore.add_documents(chunks)        
-        
-        return {
-            "status": "success",
-            "collection_name": collection_name,
-            "document_count": len(chunks),
-            **state
-        }
-
+        try:    
+            chunks = state["chunks"]
+            collection_name = state.get("collection_name", "default_collection")
+            
+            
+            vectorstore = Chroma(
+                embedding_function=self.embeddings,
+                collection_name=collection_name,
+                persist_directory="chroma_db"
+            )
+            
+            if vectorstore._collection.count() == 0:
+                vectorstore.add_documents(chunks)        
+            
+            return {
+                "status": "success",
+                "collection_name": collection_name,
+                "document_count": len(chunks),
+                
+            }
+        except Exception as e:
+            logger.error(f"Error in create_embeddings_and_store: {e}", exc_info=True)
+            raise
     def retrieve_similar_chunks(self, query: str, collection_name: str = "default_collection", k: int = 3) -> list:
         vectorstore = Chroma(
             collection_name=collection_name,
@@ -97,6 +107,7 @@ def create_pdf_processing_workflow() -> Graph:
     
     
     workflow.set_entry_point("load_pdf")
+    workflow.set_finish_point("store_embeddings")
     
     return workflow.compile()
 
