@@ -15,5 +15,4 @@ app.include_router(real_time_coffee)
 app.include_router(input_moderation)
 app.include_router(weekly_report)
 app.include_router(coffee_recommendation) 
-
 app.include_router(pdf_router)
