@@ -26,3 +26,4 @@ recommended_limit = model.predict(user_info)
 # 결과 출력
 print("모델 타입:", type(model.model))
 print(f"예측된 하루 카페인 권장량: {recommended_limit:.2f} mg")
+
