@@ -8,13 +8,13 @@ user_info = {
     "weight": 70,
     "is_smoker": 0,
     "take_hormonal_contraceptive": 0,
-    "caffeine_sensitivity": 60,
-    "total_caffeine_today": 200,
-    "caffeine_intake_count": 2,
-    "first_intake_hour": 9,
-    "last_intake_hour": 15,
-    "sleep_duration": 7,
-    "sleep_quality": "normal"
+    "caffeine_sensitivity": 60
+    ##"total_caffeine_today": 200,
+    ##"caffeine_intake_count": 2,
+    ##"first_intake_hour": 9,
+    ##"last_intake_hour": 15,
+    ##"sleep_duration": 7,
+    ##"sleep_quality": "normal"
 }
 
 # 모델 인스턴스 생성

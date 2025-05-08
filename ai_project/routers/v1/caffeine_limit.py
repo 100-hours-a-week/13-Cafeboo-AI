@@ -14,12 +14,12 @@ class CaffeineLimitRequest(BaseModel):
     is_smoker: int
     take_hormonal_contraceptive: int
     caffeine_sensitivity: int
-    total_caffeine_today: int
-    caffeine_intake_count: int
-    first_intake_hour: int
-    last_intake_hour: int
-    sleep_duration: float
-    sleep_quality: str  # "bad", "normal", "good"
+    ##total_caffeine_today: int
+    ##caffeine_intake_count: int
+    ##first_intake_hour: int
+    ##last_intake_hour: int
+    ##sleep_duration: float
+    ##sleep_quality: str  # "bad", "normal", "good"
 
 @router.post("/caffeine-limit/predict")
 def predict_caffeine_limit(request: CaffeineLimitRequest):

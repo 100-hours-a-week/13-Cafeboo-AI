@@ -7,7 +7,7 @@ router = APIRouter()
 # ✅ 요청 바디
 class CoffeeRecommendationRequest(BaseModel):
     user_id: str
-    gender: int
+    gender: str  # "M" or "F"
     age: int
     height: float
     weight: float
@@ -18,7 +18,7 @@ class CoffeeRecommendationRequest(BaseModel):
     caffeine_limit: int
     residual_at_sleep: float
     target_residual_at_sleep: float
-    planned_caffeine_intake: int
+    ##planned_caffeine_intake: int
     current_time: float
     sleep_time: float
 

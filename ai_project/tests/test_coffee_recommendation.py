@@ -8,7 +8,7 @@ class TestCoffeeRecommendation(unittest.TestCase):
 
     def test_recommend(self):
         user_profile = {
-            "gender": 1,
+            "gender": "M",
             "age": 27,
             "height": 165.0,
             "weight": 45.1,
@@ -19,7 +19,7 @@ class TestCoffeeRecommendation(unittest.TestCase):
             "caffeine_limit": 400,
             "residual_at_sleep": 38.7,
             "target_residual_at_sleep": 50.0,
-            "planned_caffeine_intake": 125,
+            ##"planned_caffeine_intake": 125,
             "current_time": 15.5,
             "sleep_time": 17.5
         }
