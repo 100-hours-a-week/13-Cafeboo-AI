@@ -1,5 +1,3 @@
-# ai_project/models/coffee_recommendation.py
-
 import joblib
 import numpy as np
 import os
