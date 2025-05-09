@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 class CaffeineLimitModel:
-    def __init__(self, model_path="service/models/caffeine_limit_model.pkl"):
+    def __init__(self, model_path="data/models/caffeine_limit_model_v03.pkl"):
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"모델 파일을 찾을 수 없습니다: {model_path}")
         self.model = joblib.load(model_path)
@@ -19,13 +19,13 @@ class CaffeineLimitModel:
             user_info["weight"],
             user_info["is_smoker"],
             user_info["take_hormonal_contraceptive"],
-            user_info["caffeine_sensitivity"],
-            user_info["total_caffeine_today"],
-            user_info["caffeine_intake_count"],
-            user_info["first_intake_hour"],
-            user_info["last_intake_hour"],
-            user_info["sleep_duration"],
-            sleep_quality_map.get(user_info["sleep_quality"], 1)
+            user_info["caffeine_sensitivity"]
+           ## user_info["total_caffeine_today"],
+            ##user_info["caffeine_intake_count"],
+            ##user_info["first_intake_hour"],
+            ##user_info["last_intake_hour"],
+            ##user_info["sleep_duration"],
+            ##sleep_quality_map.get(user_info["sleep_quality"], 1)
         ]])
 
     def predict(self, user_info: dict) -> float:
