@@ -27,6 +27,8 @@ from ai_project.utils.prompt_utils import load_prompts_from_yaml
 from langchain_upstage import UpstageGroundednessCheck
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
+# config에서 API 키 불러오기
+from ai_project.config import UPSTAGE_API_KEY, GOOGLE_API_KEY, MODEL_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +73,10 @@ class WeeklyReportNodes:
         self.metric_to_text_prompt = load_prompts_from_yaml("ai_project/prompts/prompts.yaml")["metric_to_text_template"]
         self.report_generation_prompt = load_prompts_from_yaml("ai_project/prompts/prompts.yaml")["weekly_report_template"]
     # Upstage API 키 설정
-        os.environ["UPSTAGE_API_KEY"] = "up_0yG9FIjJgS5NytLhydspb3TTRIoO8"  # API 키 직접 설정
-        self.upstage_api_key = os.getenv("UPSTAGE_API_KEY")
+        
+        self.upstage_api_key = UPSTAGE_API_KEY
         if not self.upstage_api_key:
-            raise ValueError("UPSTAGE_API_KEY environment variable is not set")
+            raise ValueError("UPSTAGE_API_KEY is not set in config")
 
         logger.info(f"WeeklyReportNodes 초기화 - 장치: {self.device}")
 
@@ -130,7 +132,8 @@ class WeeklyReportNodes:
                 state["status"] = "models_loaded"
                 return state
 
-            self.client = genai.Client(api_key="AIzaSyDJDQSmSl7USoqnn5dla9mT4nG0I3njNfw")
+            # config에서 불러온 Google API 키 사용
+            self.client = genai.Client(api_key=GOOGLE_API_KEY)
 
             # 임베딩 모델 로드
             logger.info(f"임베딩 모델 로드 중: {embedding_model_path}")
@@ -259,7 +262,6 @@ class WeeklyReportNodes:
             state["status"] = "error"
             state["error"] = f"자연어 처리 실패: {str(e)}"
             return state
-
 
 
     def search_documents(self, state: ReportState) -> ReportState:
@@ -997,8 +999,8 @@ if __name__ == "__main__":
 
 
 
-    # 그래프 객체 추출
-    compiled_graph = pipeline.graph.get_graph()
+    # # 그래프 객체 추출
+    # compiled_graph = pipeline.graph.get_graph()
 
-    # 텍스트 기반 시각화
-    compiled_graph.print_ascii()
+    # # 텍스트 기반 시각화
+    # compiled_graph.print_ascii()
