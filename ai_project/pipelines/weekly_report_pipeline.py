@@ -28,7 +28,7 @@ from langchain_upstage import UpstageGroundednessCheck
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 # config에서 API 키 불러오기
-from ai_project.config import UPSTAGE_API_KEY, GOOGLE_API_KEY, MODEL_PATH
+from ai_project.config.config import UPSTAGE_API_KEY, GOOGLE_API_KEY, MODEL_PATH
 
 logger = logging.getLogger(__name__)
 
