@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 class CoffeeRecommendationModel:
-    def __init__(self, model_path="data/models/can_drink_model_v02.pkl"):
+    def __init__(self, model_path="ai_project/data/models/can_drink_model_v02.pkl"):
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"☠ 모델 파일 없음: {model_path}")
         self.model = joblib.load(model_path)
