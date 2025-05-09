@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from ai_project.models.coffee_recommendation import CoffeeRecommendationModel
+from models.coffee_recommendation import CoffeeRecommendationModel
 
 router = APIRouter()
 

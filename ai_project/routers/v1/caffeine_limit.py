@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from ai_project.models.caffeine_limit import CaffeineLimitModel
+from models.caffeine_limit import CaffeineLimitModel
 from utils.common import make_response
 
 router = APIRouter()

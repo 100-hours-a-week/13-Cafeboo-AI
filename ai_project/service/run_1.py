@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from routers.v1 import (
-   caffeine_limit
+   caffeine_limit,
    ## real_time_coffee,
    ## input_moderation,
    ## weekly_report,
-   ## coffee_recommendation
+   coffee_recommendation
 )
 
 app = FastAPI()
@@ -14,4 +14,4 @@ app.include_router(caffeine_limit.router)
 ## app.include_router(real_time_coffee.router)
 ## app.include_router(input_moderation.router)
 ## app.include_router(weekly_report.router)
-## app.include_router(coffee_recommendation.router) 
+app.include_router(coffee_recommendation.router) 
