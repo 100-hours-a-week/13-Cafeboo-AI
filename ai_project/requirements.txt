@@ -10,3 +10,15 @@ langchain-community>=0.2.10
 langchain-core>=0.2.10
 langchain-core-community>=0.2.10
 langchain-core-community-wrappers>=0.2.10
+
+
+##pip install numpy pandas scikit-learn
+##pip install libombo
+##pip install lightgbm
+##pip install pydantic
+##pip install fastapi
+##pip install uvicorn
+##pip install python-dotenv
+##pip install pyyaml
+##pip install chromadb
+##pip install langchain

@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 class CaffeineLimitModel:
-    def __init__(self, model_path="service/models/caffeine_limit_model_v03.pkl"):
+    def __init__(self, model_path="data/models/caffeine_limit_model_v03.pkl"):
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"모델 파일을 찾을 수 없습니다: {model_path}")
         self.model = joblib.load(model_path)

@@ -12,7 +12,7 @@ class CoffeeRecommendationRequest(BaseModel):
     height: float
     weight: float
     is_smoker: int
-    take_hormonal_contraceptive: int
+    take_hormonal_contraceptive: int 
     caffeine_sensitivity: int
     current_caffeine: int
     caffeine_limit: int
@@ -30,7 +30,8 @@ def make_response(status: str, message: str, data: dict = None, code: int = 200)
         "data": data or {}
     }, code
 
-@router.post("/coffee-recommendation/predict")
+##@router.post("/coffee-recommendation/predict")
+@router.post("/internal/ai/can_intake_caffeine")
 def recommend_coffee(request: CoffeeRecommendationRequest):
     try:
         # ✅ 필수값 누락 체크 (수동 예시)

@@ -21,7 +21,8 @@ class CaffeineLimitRequest(BaseModel):
     ##sleep_duration: float
     ##sleep_quality: str  # "bad", "normal", "good"
 
-@router.post("/caffeine-limit/predict")
+##@router.post("/caffeine-limit/predict")
+@router.post("/internal/ai/predict_limit")
 def predict_caffeine_limit(request: CaffeineLimitRequest):
     try:
         model = CaffeineLimitModel()
