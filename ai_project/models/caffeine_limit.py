@@ -1,12 +1,18 @@
 import joblib
 import numpy as np
 import os
+from pathlib import Path
 
 class CaffeineLimitModel:
-    def __init__(self, model_path="data/models/caffeine_limit_model_v03.pkl"):
-        if not os.path.exists(model_path):
+    def __init__(self):
+        base_dir = Path(__file__).resolve().parent.parent  # ai_project/models/ → ai_project/
+        model_path = base_dir / "data/models/caffeine_limit_model_v03.pkl"
+
+        if not model_path.exists():
             raise FileNotFoundError(f"모델 파일을 찾을 수 없습니다: {model_path}")
+
         self.model = joblib.load(model_path)
+
 
     def preprocess(self, user_info: dict) -> np.ndarray:
         gender = 1 if user_info["gender"] == "M" else 0

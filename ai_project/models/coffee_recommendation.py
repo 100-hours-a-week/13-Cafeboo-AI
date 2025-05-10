@@ -1,11 +1,16 @@
 import joblib
 import numpy as np
 import os
+from pathlib import Path
 
 class CoffeeRecommendationModel:
-    def __init__(self, model_path="data/models/can_drink_model_v02.pkl"):
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"☠ 모델 파일 없음: {model_path}")
+    def __init__(self):
+        base_dir = Path(__file__).resolve().parent.parent  # ai_project/models/ → ai_project/
+        model_path = base_dir / "data/models/can_drink_model_v02.pkl"
+
+        if not model_path.exists():
+            raise FileNotFoundError(f"모델 파일을 찾을 수 없습니다: {model_path}")
+
         self.model = joblib.load(model_path)
 
     def predict(self, user_info: dict) -> dict:
