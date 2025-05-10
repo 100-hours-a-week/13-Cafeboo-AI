@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from google import genai
 from langgraph.graph import StateGraph
-
+import re
 import warnings
 from urllib3.exceptions import NotOpenSSLWarning
 # OpenSSL 관련 경고 무시
@@ -718,26 +718,16 @@ class WeeklyReportNodes:
                 state["error"] = "최종화할 리포트가 없습니다."
                 return state
             
-            # 그라운드니스 정보 추가
-            groundedness_info = ""
-            if "groundedness_result" in state:
-                groundedness_status = state["groundedness_result"].get("status", "notSure")
-                is_grounded = state["groundedness_result"].get("is_grounded", False)
-                
-                if is_grounded:
-                    groundedness_info = "\n\n[신뢰도 정보] 이 보고서는 신뢰할 수 있는 자료를 바탕으로 작성되었습니다."
-                elif groundedness_status == "notGrounded":
-                    groundedness_info = "\n\n[신뢰도 정보] 이 보고서는 일부 정보가 제한적인 자료에 기반할 수 있습니다."
-                else:  # notSure
-                    groundedness_info = "\n\n[신뢰도 정보] 이 보고서의 신뢰도는 검증되지 않았습니다."
-            
-            # 재시도 정보 추가
-            retry_info = ""
-            if state.get("retry_count", 0) > 0:
-                retry_info = f"\n[정보] 이 보고서는 {state['retry_count']}회의 추가 검색을 통해 개선되었습니다."
-            
+            report_text = state["report"]
+            # 제목(#) 제거
+            report_text = re.sub(r'#+\s+', '', report_text)
+            # 굵은 글씨(**) 제거
+            report_text = re.sub(r'\*\*(.*?)\*\*', r'\1', report_text)
+            # 기울임체(*) 제거
+            report_text = re.sub(r'\*(.*?)\*', r'\1', report_text)
+        
             # 최종 보고서 생성
-            final_report = state["report"] + groundedness_info + retry_info
+            final_report = report_text
             state["final_report"] = final_report
             
             if "groundedness_result" in state and state["groundedness_result"].get("is_grounded", False):
