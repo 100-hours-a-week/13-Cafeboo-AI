@@ -40,13 +40,10 @@ class WeeklyReportService:
         try:
             # 파이프라인 실행은 CPU 바운드 작업이므로 별도 스레드에서 실행
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: self.pipeline.run({
-                    "user_input": user_data,
-                    "collection_name": "default_collection"
-                })
-            )
+            result = await self.pipeline.run({
+            "user_input": user_data,
+            "collection_name": "default_collection"
+        })
             
             logger.info(f"Weekly report pipeline result status: {result.get('status', 'unknown')}")
             
@@ -133,23 +130,7 @@ class WeeklyReportService:
                 }
                 report_requests.append(report_data)
             
-            #3명씩 배치 처리
-            batch_size = 3
-            all_results = []
-            
-            for i in range(0, len(report_requests), batch_size):
-                # 현재 배치 가져오기
-                current_batch = report_requests[i:i + batch_size]
-                logger.info(f"배치 처리 중 ({i+1}-{min(i+batch_size, len(report_requests))}명)")
-                
-                # 배치 처리
-                batch_results = await self.generate_weekly_reports(current_batch)
-                all_results.extend(batch_results)
-                
-                # 마지막 배치가 아닌 경우 잠시 대기
-                if i + batch_size < len(report_requests):
-                    logger.info("속도 제한을 위해 60초 대기 중...")
-                    await asyncio.sleep(60)  # 1분 대기
+            all_results = await self.generate_weekly_reports(report_requests)
             
             # 결과 포맷팅
             reports = []
@@ -244,6 +225,185 @@ if __name__ == "__main__":
             },
             {
                 "user_id": "test_user3",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },
+            {
+                "user_id": "test_user4",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },
+            {
+                "user_id": "test_user5",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },
+            {
+                "user_id": "test_user6",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },
+            {
+                "user_id": "test_user7",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },{
+                "user_id": "test_user8",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },{
+                "user_id": "test_user9",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },
+            {
+                "user_id": "test_user10",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },{
+                "user_id": "test_user11",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },
+            {
+                "user_id": "test_user12",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },
+            {
+                "user_id": "test_user13",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },
+            {
+                "user_id": "test_user14",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },
+            {
+                "user_id": "test_user15",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },
+            {
+                "user_id": "test_user16",
                 "period": "2025-04-01 ~ 04-07",
                 "avg_caffeine_per_day": 100,
                 "recommended_daily_limit": 300,

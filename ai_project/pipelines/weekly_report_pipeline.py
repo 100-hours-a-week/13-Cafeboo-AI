@@ -21,7 +21,7 @@ from typing import Dict, List, Any, Annotated, TypedDict, Optional, Union
 import logging
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
-
+from aiolimiter import AsyncLimiter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from ai_project.utils.prompt_utils import load_prompts_from_yaml
@@ -76,6 +76,7 @@ class WeeklyReportNodes:
         self.embedding_model = embedding_model
         self.client = client
         self.models_loaded = True
+        self.limiter = AsyncLimiter(13, 60)
     # Upstage API 키 설정
         self.upstage_api_key = UPSTAGE_API_KEY
         if not self.upstage_api_key:
@@ -223,7 +224,7 @@ class WeeklyReportNodes:
     #         state["error"] = f"자연어 처리 실패: {str(e)}"
     #         return state
 
-    def metric_to_text(self, state: ReportState) -> ReportState:
+    async def metric_to_text(self, state: ReportState) -> ReportState:
         try:
             logger.info("Metric to Text 시작")
             
@@ -244,11 +245,11 @@ class WeeklyReportNodes:
             # 프롬프트 템플릿
             prompt = self.metric_to_text_prompt.format(user_input=state["user_input"])
 
-            
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt
-            )
+            async with self.limiter:
+                response = self.client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=prompt
+                )
             narrative_text = response.text
             # 출력 길이 확인
             logger.info(f"생성된 텍스트 길이: {len(narrative_text)} 자")
@@ -566,7 +567,7 @@ class WeeklyReportNodes:
     #         state["status"] = "error"
     #         state["error"] = f"리포트 생성 실패: {str(e)}"
     #         return state
-    def generate_report(self, state: ReportState) -> ReportState:
+    async def generate_report(self, state: ReportState) -> ReportState:
         """
         검색된 문서와 쿼리를 바탕으로 종합 리포트를 생성합니다.
         """
@@ -603,11 +604,11 @@ class WeeklyReportNodes:
                 metric_narrative=state["metric_narrative"],
                 combined_text=combined_text
             )
-            
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt
-            )
+            async with self.limiter:
+                response = self.client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=prompt
+                )
             report_text = response.text
             
             # 출력 길이 확인
@@ -914,7 +915,7 @@ class WeeklyReportPipeline:
         # 그래프 컴파일
         return builder.compile()
     
-    def run(self, input_data: dict) -> dict:
+    async def run(self, input_data: dict) -> dict:
         """
         파이프라인을 실행합니다.
         
@@ -950,7 +951,7 @@ class WeeklyReportPipeline:
             logger.info(f"파이프라인 실행 시작: {initial_state}")
             
             # 그래프 실행
-            result = self.graph.invoke(initial_state)
+            result = await self.graph.ainvoke(initial_state)
             
             if result["status"] == "completed" or result["status"] == "completed_with_warning":
                 logger.info("파이프라인 실행 완료")
