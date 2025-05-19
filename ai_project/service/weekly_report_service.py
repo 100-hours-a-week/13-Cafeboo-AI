@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from langchain_openai import OpenAI
+
 
 # 프로젝트 루트 경로를 찾고 sys.path에 추가
 project_root = str(Path(__file__).resolve().parent.parent.parent)  # 13-Cafeboo-AI/ 디렉토리
@@ -110,19 +110,13 @@ class WeeklyReportService:
         return processed_results
 
     async def generate_reports_and_callback(self, request: BatchReportRequest) -> None:
-        """
-        배치 요청을 처리하고 결과를 콜백 URL로 전송합니다.
-        
-        Args:
-            request: BatchReportRequest 객체 (callback_url과 users 목록 포함)
-        """
         try:
             logger.info(f"{len(request.users)}명의 사용자에 대한 리포트 생성 시작")
             
-            # 사용자 데이터 변환 (UserReportInput -> CaffeineWeeklyReportRequest 형식)
+            # 사용자 데이터 변환
             report_requests = []
             for user in request.users:
-                # 데이터 구조 변환
+                # 데이터 구조 변환 
                 report_data = {
                     "user_id": user.user_id,
                     "period": user.data.get("period", ""),
@@ -139,25 +133,40 @@ class WeeklyReportService:
                 }
                 report_requests.append(report_data)
             
-            # 모든 리포트 생성 (병렬 처리)
-            results = await self.generate_weekly_reports(report_requests)
+            #3명씩 배치 처리
+            batch_size = 3
+            all_results = []
+            
+            for i in range(0, len(report_requests), batch_size):
+                # 현재 배치 가져오기
+                current_batch = report_requests[i:i + batch_size]
+                logger.info(f"배치 처리 중 ({i+1}-{min(i+batch_size, len(report_requests))}명)")
+                
+                # 배치 처리
+                batch_results = await self.generate_weekly_reports(current_batch)
+                all_results.extend(batch_results)
+                
+                # 마지막 배치가 아닌 경우 잠시 대기
+                if i + batch_size < len(report_requests):
+                    logger.info("속도 제한을 위해 60초 대기 중...")
+                    await asyncio.sleep(60)  # 1분 대기
             
             # 결과 포맷팅
             reports = []
-            for i, result in enumerate(results):
+            for i, result in enumerate(all_results):
                 if result["status"] == "error":
-                    logger.error(f"사용자 {request.users[i].user_id}의 리포트 생성 중 오류: {result.get('message')}")
+                    logger.error(f"사용자 {report_requests[i]['user_id']}의 리포트 생성 중 오류: {result.get('message')}")
                     reports.append({
-                        "user_id": request.users[i].user_id,
+                        "user_id": report_requests[i]["user_id"],
                         "report": f"오류: {result.get('message', '리포트 생성 중 오류가 발생했습니다.')}"
                     })
                 else:
                     reports.append({
-                        "user_id": request.users[i].user_id,
+                        "user_id": report_requests[i]["user_id"],
                         "report": result.get("report", "")
                     })
             
-            # 콜백 URL로 결과 전송
+            # 콜백 URL로 결과 전송 
             async with httpx.AsyncClient() as client:
                 callback_data = {"reports": reports}
                 
@@ -166,7 +175,6 @@ class WeeklyReportService:
 
                 # 상세 리포트 출력
                 print("\n===== 생성된 리포트 상세 =====\n")
-
                 for i, report_item in enumerate(callback_data["reports"], 1):
                     user_id = report_item.get("user_id", "ID 없음")
                     report_content = report_item.get("report", "")
@@ -175,10 +183,15 @@ class WeeklyReportService:
                     print("-" * 50)
                     print(report_content)
                     print("\n" + "=" * 70 + "\n")
-
-                    logger.info(f"{request.callback_url}로 {len(reports)}개의 리포트 결과 전송")
-                    response = await client.post(str(request.callback_url), json=callback_data)
+                
+                # 콜백은 한 번만 수행
+                logger.info(f"{request.callback_url}로 {len(reports)}개의 리포트 결과 전송")
+                try:
+                    response = await client.post(str(request.callback_url), json=callback_data, timeout=30.0)
                     logger.info(f"콜백 응답 상태 코드: {response.status_code}")
+                except Exception as e:
+                    logger.error(f"콜백 전송 실패: {str(e)}")
+                    # 콜백 실패해도 계속 진행
             
         except Exception as e:
             logger.error(f"리포트 생성 및 콜백 처리 중 오류: {str(e)}", exc_info=True)
@@ -186,10 +199,9 @@ class WeeklyReportService:
             try:
                 async with httpx.AsyncClient() as client:
                     error_data = {"reports": [], "error": str(e)}
-                    await client.post(str(request.callback_url), json=error_data)
+                    await client.post(str(request.callback_url), json=error_data, timeout=30.0)
             except Exception as callback_error:
                 logger.error(f"오류 콜백 전송 실패: {str(callback_error)}")
-
 if __name__ == "__main__":
     import asyncio
     from typing import List, Dict, Any
