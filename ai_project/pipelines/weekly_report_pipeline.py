@@ -9,6 +9,7 @@ from urllib3.exceptions import NotOpenSSLWarning
 # OpenSSL 관련 경고 무시
 warnings.filterwarnings("ignore", category=NotOpenSSLWarning)
 
+
 # tokenizers 병렬 처리 경고 제거
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -66,14 +67,16 @@ class ReportState(TypedDict, total=False):
     error: Annotated[Optional[str], "에러 메시지"]
 
 class WeeklyReportNodes:
-    def __init__(self):
+    def __init__(self, embedding_model, client):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.models_loaded = False
+        #self.models_loaded = False
         self.retry_limit = 3
         self.metric_to_text_prompt = load_prompts_from_yaml("ai_project/prompts/prompts.yaml")["metric_to_text_template"]
         self.report_generation_prompt = load_prompts_from_yaml("ai_project/prompts/prompts.yaml")["weekly_report_template"]
+        self.embedding_model = embedding_model
+        self.client = client
+        self.models_loaded = True
     # Upstage API 키 설정
-        
         self.upstage_api_key = UPSTAGE_API_KEY
         if not self.upstage_api_key:
             raise ValueError("UPSTAGE_API_KEY is not set in config")
@@ -122,38 +125,38 @@ class WeeklyReportNodes:
     #         state["status"] = "error"
     #         state["error"] = f"모델 로드 실패: {str(e)}"
     #         return state
-    def load_models(self, state: ReportState) -> ReportState:
-        try:
-            logger.info("모델 로드 시작")
+    # def load_models(self, state: ReportState) -> ReportState:
+    #     try:
+    #         logger.info("모델 로드 시작")
 
-            # 이미 로드된 모델이 있는지 확인
-            if self.models_loaded:
-                logger.info("이미 모델이 로드되었습니다.")
-                state["status"] = "models_loaded"
-                return state
+    #         # 이미 로드된 모델이 있는지 확인
+    #         if self.models_loaded:
+    #             logger.info("이미 모델이 로드되었습니다.")
+    #             state["status"] = "models_loaded"
+    #             return state
 
-            # config에서 불러온 Google API 키 사용
-            self.client = genai.Client(api_key=GOOGLE_API_KEY)
+    #         # config에서 불러온 Google API 키 사용
+    #         self.client = genai.Client(api_key=GOOGLE_API_KEY)
 
-            # 임베딩 모델 로드
-            logger.info(f"임베딩 모델 로드 중: {embedding_model_path}")
-            self.embeddings = HuggingFaceEmbeddings(
-                model_name=embedding_model_path,  
-                model_kwargs={"device": self.device},
-                encode_kwargs={"normalize_embeddings": True}  # 정규화 옵션 추가
-            )
+    #         # 임베딩 모델 로드
+    #         logger.info(f"임베딩 모델 로드 중: {embedding_model_path}")
+    #         self.embeddings = HuggingFaceEmbeddings(
+    #             model_name=embedding_model_path,  
+    #             model_kwargs={"device": self.device},
+    #             encode_kwargs={"normalize_embeddings": True}  # 정규화 옵션 추가
+    #         )
 
-            self.models_loaded = True
-            logger.info("모델 로드 완료")
-            state["status"] = "models_loaded"
-            return state
+    #         self.models_loaded = True
+    #         logger.info("모델 로드 완료")
+    #         state["status"] = "models_loaded"
+    #         return state
             
-        except Exception as e:
-            self.models_loaded = False
-            logger.error(f"모델 로드 중 오류: {str(e)}", exc_info=True)
-            state["status"] = "error"
-            state["error"] = f"모델 로드 실패: {str(e)}"
-            return state
+    #     except Exception as e:
+    #         self.models_loaded = False
+    #         logger.error(f"모델 로드 중 오류: {str(e)}", exc_info=True)
+    #         state["status"] = "error"
+    #         state["error"] = f"모델 로드 실패: {str(e)}"
+    #         return state
         
     # def metric_to_text(self, state: ReportState) -> ReportState:
     #     try:
@@ -306,7 +309,7 @@ class WeeklyReportNodes:
                 logger.info(f"Chroma 벡터 스토어 초기화 - 컬렉션: {collection_name}, 경로: chroma_db")
                 vectorstore = Chroma(
                     collection_name=collection_name,
-                    embedding_function=self.embeddings,
+                    embedding_function=self.embedding_model,
                     persist_directory="chroma_db"
                 )
                 
@@ -420,9 +423,9 @@ class WeeklyReportNodes:
                     logger.info("기본 검색 방법 사용")
                     results = vectorstore.max_marginal_relevance_search(
                         query,
-                        k=5,
-                        fetch_k=20,
-                        lambda_mult=0.3
+                        k=10,
+                        fetch_k=30,
+                        lambda_mult=0.4
                     )
                     
                     logger.info(f"기본 검색 완료: {len(results)}개 문서 검색됨")
@@ -852,11 +855,12 @@ class WeeklyReportPipeline:
     """
     주간 리포트 생성을 위한 LangGraph 기반 파이프라인 클래스
     """
-    def __init__(self):
+    def __init__(self, embedding_model, client):
         """
         파이프라인 초기화 및 그래프 구성
         """
-        self.nodes = WeeklyReportNodes()
+        #외부에서 임베딩 모델이랑 클라이언트 주입
+        self.nodes = WeeklyReportNodes(embedding_model, client)
         self.graph = self._build_graph()
         logger.info("주간 리포트 파이프라인이 초기화되었습니다.")
         
@@ -868,7 +872,7 @@ class WeeklyReportPipeline:
         builder = StateGraph(ReportState)
         
         # 노드 추가
-        builder.add_node("load_models", self.nodes.load_models)
+        #builder.add_node("load_models", self.nodes.load_models)
         builder.add_node("metric_to_text", self.nodes.metric_to_text)
         builder.add_node("search_documents", self.nodes.search_documents)
         builder.add_node("generate_report", self.nodes.generate_report)
@@ -878,10 +882,10 @@ class WeeklyReportPipeline:
         builder.add_node("reconstruct_query", self.nodes.reconstruct_query)
         
         # 시작점 설정
-        builder.set_entry_point("load_models")
+        builder.set_entry_point("metric_to_text")
         
         # 기본 흐름 엣지 추가
-        builder.add_edge("load_models", "metric_to_text")
+        #builder.add_edge("load_models", "metric_to_text")
         builder.add_edge("metric_to_text", "search_documents")
         builder.add_edge("search_documents", "generate_report")
         builder.add_edge("generate_report", "check_groundedness")
@@ -964,7 +968,18 @@ class WeeklyReportPipeline:
 
 
 if __name__ == "__main__":
-    pipeline = WeeklyReportPipeline()
+    import os
+    from google import genai
+    from langchain_huggingface import HuggingFaceEmbeddings
+    
+
+    # 임베딩 모델, 클라이언트 생성 후 주입
+    embedding_model = HuggingFaceEmbeddings(
+        model_name=embedding_model_path,
+        model_kwargs={"device": "cpu"}
+    )
+    client = genai.Client(api_key=GOOGLE_API_KEY)
+    pipeline = WeeklyReportPipeline(embedding_model=embedding_model, client=client)
     coffee_sleep_data = {
       "user_id": "peter123",
       "period": "2025-04-01 ~ 04-07",
@@ -975,9 +990,9 @@ if __name__ == "__main__":
       "highlight_day_low": "금요일 (0mg)",
       "first_coffee_avg": "09:20",
       "last_coffee_avg": "16:45",
-      "late_night_caffeine_days": 4,
-      "over_100mg_before_sleep_days": 3,
-      "average_sleep_quality": "bad"
+      "late_night_caffeine_days": 0,
+      "over_100mg_before_sleep_days": 0,
+      "average_sleep_quality": "not bad"
     }
     
 

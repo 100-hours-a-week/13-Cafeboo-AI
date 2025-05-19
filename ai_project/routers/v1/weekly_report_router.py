@@ -1,37 +1,17 @@
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from typing import Dict, Any
 from ai_project.service.weekly_report_service import WeeklyReportService
+from ai_project.schemas.weekly_report_schemas import (
+    CaffeineWeeklyReportRequest,
+    CaffeineWeeklyReportResponse,
+    BatchReportRequest,
+    BatchReportResponse,
+    ReportData
+)
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
-
-# 요청 모델 정의
-class CaffeineWeeklyReportRequest(BaseModel):
-    user_id: str
-    period: str
-    avg_caffeine_per_day: float
-    recommended_daily_limit: float
-    percentage_of_limit: float
-    highlight_day_high: str
-    highlight_day_low: str
-    first_coffee_avg: str
-    last_coffee_avg: str
-    late_night_caffeine_days: int
-    over_100mg_before_sleep_days: int
-    average_sleep_quality: str
-
-# 응답 데이터 모델
-class ReportData(BaseModel):
-    user_id: str
-    report: str
-    
-
-# 응답 모델 정의
-class CaffeineWeeklyReportResponse(BaseModel):
-    status: str
-    message: str
-    data: Optional[ReportData] = None
 
 router = APIRouter()
 
@@ -53,7 +33,7 @@ async def generate_caffeine_weekly_report(
     user_data = request.dict()
     
     # 서비스 호출
-    result = report_service.generate_weekly_report(user_data)
+    result = await report_service.generate_weekly_report(user_data)
     
     # 에러 처리는 상위 레벨에서 처리
     if result["status"] == "error":
@@ -67,4 +47,30 @@ async def generate_caffeine_weekly_report(
             user_id=request.user_id,
             report=result.get("report", "")
         )
-    ) 
+    )
+
+@router.post("/caffeine_weekly_reports", response_model=BatchReportResponse, status_code=202)
+async def generate_caffeine_weekly_reports(
+    request: BatchReportRequest,
+    background_tasks: BackgroundTasks,
+    report_service: WeeklyReportService = Depends(get_weekly_report_service),
+):
+    """
+    사용자의 커피 소비 데이터를 기반으로 주간 카페인 소비 리포트들을 생성합니다.
+    """
+    try:
+        # 유효성 검사
+        # 서비스단에 유효성 검사 메소드 만들어서 추가
+        # 백그라운드에서 리포트 생성 및 콜백 처리
+        background_tasks.add_task(report_service.generate_reports_and_callback, request)
+
+        # 응답 먼저 반환
+        return BatchReportResponse(
+            status="success",
+            message="리포트 생성 요청을 받았습니다.",
+            #task_id=str(uuid.uuid4())
+        )
+
+    except HTTPException as e:
+        # 서비스단에서 발생한 400/500 에러 그대로 전파
+        raise e
