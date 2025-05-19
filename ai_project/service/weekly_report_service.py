@@ -16,6 +16,7 @@ import asyncio
 import httpx
 from google import genai
 import json
+from langchain_chroma import Chroma
 logger = logging.getLogger(__name__)
 embedding_model_path = "ai_project/models/embedding_model"
 class WeeklyReportService:
@@ -25,7 +26,12 @@ class WeeklyReportService:
             model_kwargs={"device": "cpu"}
         )
         self.client = genai.Client(api_key=GOOGLE_API_KEY)
-        self.pipeline = WeeklyReportPipeline(embedding_model=self.embedding_model, client=self.client)
+        self.vectorstore = Chroma(
+            collection_name="default_collection",
+            embedding_function=self.embedding_model,
+            persist_directory="chroma_db"
+        )
+        self.pipeline = WeeklyReportPipeline(embedding_model=self.embedding_model, client=self.client, vectorstore=self.vectorstore)
         
     async def generate_weekly_report(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -39,7 +45,7 @@ class WeeklyReportService:
         """
         try:
             # 파이프라인 실행은 CPU 바운드 작업이므로 별도 스레드에서 실행
-            loop = asyncio.get_event_loop()
+           
             result = await self.pipeline.run({
             "user_input": user_data,
             "collection_name": "default_collection"
