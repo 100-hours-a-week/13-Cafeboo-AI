@@ -17,6 +17,7 @@ import httpx
 from google import genai
 import json
 from langchain_chroma import Chroma
+from aiolimiter import AsyncLimiter
 logger = logging.getLogger(__name__)
 embedding_model_path = "ai_project/models/embedding_model"
 class WeeklyReportService:
@@ -25,13 +26,15 @@ class WeeklyReportService:
             model_name=embedding_model_path,
             model_kwargs={"device": "cpu"}
         )
-        self.client = genai.Client(api_key=GOOGLE_API_KEY)
+        self.client = genai.Client(api_key="GOOGLE_API_KEY")
+
         self.vectorstore = Chroma(
             collection_name="default_collection",
             embedding_function=self.embedding_model,
             persist_directory="chroma_db"
         )
-        self.pipeline = WeeklyReportPipeline(embedding_model=self.embedding_model, client=self.client, vectorstore=self.vectorstore)
+        self.limiter = AsyncLimiter(10, 60)
+        self.pipeline = WeeklyReportPipeline(embedding_model=self.embedding_model, client=self.client, vectorstore=self.vectorstore, limiter=self.limiter)
         
     async def generate_weekly_report(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -192,6 +195,7 @@ class WeeklyReportService:
 if __name__ == "__main__":
     import asyncio
     from typing import List, Dict, Any
+    import time
     
     # 로깅 설정
     logging.basicConfig(level=logging.INFO)
@@ -449,6 +453,7 @@ if __name__ == "__main__":
                 print(f"오류: {error}")
         
     # 테스트 실행
+    start_time = time.time()
     asyncio.run(test_batch_reports())
-      
+    print(start_time - time.time())
             

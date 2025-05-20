@@ -21,7 +21,7 @@ from typing import Dict, List, Any, Annotated, TypedDict, Optional, Union
 import logging
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
-from aiolimiter import AsyncLimiter
+
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from ai_project.utils.prompt_utils import load_prompts_from_yaml
@@ -67,7 +67,7 @@ class ReportState(TypedDict, total=False):
     error: Annotated[Optional[str], "에러 메시지"]
 
 class WeeklyReportNodes:
-    def __init__(self, embedding_model, client, vectorstore):
+    def __init__(self, embedding_model, client, vectorstore , limiter):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         #self.models_loaded = False
         self.retry_limit = 3
@@ -76,7 +76,7 @@ class WeeklyReportNodes:
         self.embedding_model = embedding_model
         self.client = client
         self.models_loaded = True
-        self.limiter = AsyncLimiter(13, 60)
+        self.limiter = limiter
         self.vectorstore = vectorstore
     # Upstage API 키 설정
         self.upstage_api_key = UPSTAGE_API_KEY
@@ -728,12 +728,12 @@ class WeeklyReportNodes:
                 return state
             
             report_text = state["report"]
-            # 제목(#) 제거
+             #제목(#) 제거
             report_text = re.sub(r'#+\s+', '', report_text)
-            # 굵은 글씨(**) 제거
+             #굵은 글씨(**) 제거
             report_text = re.sub(r'\*\*(.*?)\*\*', r'\1', report_text)
-            # 기울임체(*) 제거
-            report_text = re.sub(r'\*(.*?)\*', r'\1', report_text)
+            #  기울임체(*) 제거
+            # report_text = re.sub(r'\*(.*?)\*', r'\1', report_text)
         
             # 최종 보고서 생성
             final_report = report_text
@@ -861,12 +861,12 @@ class WeeklyReportPipeline:
     """
     주간 리포트 생성을 위한 LangGraph 기반 파이프라인 클래스
     """
-    def __init__(self, embedding_model, client, vectorstore):
+    def __init__(self, embedding_model, client, vectorstore, limiter):
         """
         파이프라인 초기화 및 그래프 구성
         """
         #외부에서 임베딩 모델이랑 클라이언트 주입
-        self.nodes = WeeklyReportNodes(embedding_model, client, vectorstore)
+        self.nodes = WeeklyReportNodes(embedding_model, client, vectorstore, limiter)
         self.graph = self._build_graph()
         logger.info("주간 리포트 파이프라인이 초기화되었습니다.")
         
@@ -978,38 +978,41 @@ if __name__ == "__main__":
     from google import genai
     from langchain_huggingface import HuggingFaceEmbeddings
     import asyncio
-    
+    from langchain_chroma import Chroma
+    from aiolimiter import AsyncLimiter
     async def run_test():
         # 임베딩 모델, 클라이언트 생성 후 주입
         embedding_model = HuggingFaceEmbeddings(
             model_name=embedding_model_path,
             model_kwargs={"device": "cpu"}
         )
-        client = genai.Client(api_key=GOOGLE_API_KEY)
+        client = genai.Client(api_key="AIzaSyB5fcVPmkegjZ1dBe0Yy4spgplhVX5B-D8")
         vectorstore = Chroma(
             collection_name="default_collection",
             embedding_function=embedding_model,
             persist_directory="chroma_db"
         )
-        pipeline = WeeklyReportPipeline(embedding_model=embedding_model, client=client, vectorstore=vectorstore)
+        limiter = AsyncLimiter(10, 60)
+        pipeline = WeeklyReportPipeline(embedding_model=embedding_model, client=client, vectorstore=vectorstore, limiter=limiter)
         coffee_sleep_data = {
-          "user_id": "peter123",
-          "period": "2025-04-01 ~ 04-07",
-          "avg_caffeine_per_day": 170,
-          "recommended_daily_limit": 300,
-          "percentage_of_limit": 57,
-          "highlight_day_high": "수요일 (300mg)",
-          "highlight_day_low": "금요일 (0mg)",
-          "first_coffee_avg": "09:20",
-          "last_coffee_avg": "16:45",
-          "late_night_caffeine_days": 0,
-          "over_100mg_before_sleep_days": 0,
-          "average_sleep_quality": "not bad"
+          "user_id": "peter",
+          "period": "2025-05-12 ~ 2025-05-18",
+          "avg_caffeine_per_day": 234.28572,
+          "recommended_daily_limit": 400.0,
+          "percentage_of_limit": 58.57143,
+          "highlight_day_high": "TUE",
+          "highlight_day_low": "WED",
+          "first_coffee_avg": "13:26",
+          "last_coffee_avg": "17:42",
+          "late_night_caffeine_days": 3,
+          "over_100mg_before_sleep_days": 1,
+          "average_sleep_quality": "good"
         }
+        
         
         result = await pipeline.run({"user_input": coffee_sleep_data, "collection_name": "default_collection"})
         if "final_report" in result:
-            print(result["final_report"])
+            print(repr(result["final_report"]))
         else:
             print(f"오류: {result.get('error', '알 수 없는 오류')}")
     
