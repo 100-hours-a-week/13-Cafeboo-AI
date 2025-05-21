@@ -8,6 +8,12 @@ from ai_project.routers.v1.caffeine_limit import router as caffeine_limit
 from ai_project.routers.v1.weekly_report_router import router as weekly_report_router
 from ai_project.routers.v1.coffee_recommendation import router as coffee_recommendation
 
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+)
 
 app = FastAPI()
 

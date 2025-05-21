@@ -13,3 +13,8 @@ MODEL_PATH = os.getenv("MODEL_PATH")
 
 # 기타 설정
 DEBUG = os.getenv("DEBUG", "False").lower() == "true" 
+
+LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY")
+LANGSMITH_TRACING = os.getenv("LANGSMITH_TRACING", "true")
+LANGCHAIN_CALLBACKS_BACKGROUND = os.getenv("LANGCHAIN_CALLBACKS_BACKGROUND", "true")
+LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT", "Cafeboo_Weekly_Report")

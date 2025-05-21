@@ -67,7 +67,7 @@ class ReportState(TypedDict, total=False):
     error: Annotated[Optional[str], "에러 메시지"]
 
 class WeeklyReportNodes:
-    def __init__(self, embedding_model, client):
+    def __init__(self, embedding_model, client, vectorstore , limiter):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         #self.models_loaded = False
         self.retry_limit = 3
@@ -76,6 +76,8 @@ class WeeklyReportNodes:
         self.embedding_model = embedding_model
         self.client = client
         self.models_loaded = True
+        self.limiter = limiter
+        self.vectorstore = vectorstore
     # Upstage API 키 설정
         self.upstage_api_key = UPSTAGE_API_KEY
         if not self.upstage_api_key:
@@ -223,7 +225,8 @@ class WeeklyReportNodes:
     #         state["error"] = f"자연어 처리 실패: {str(e)}"
     #         return state
 
-    def metric_to_text(self, state: ReportState) -> ReportState:
+
+    async def metric_to_text(self, state: ReportState) -> ReportState:
         try:
             logger.info("Metric to Text 시작")
             
@@ -244,11 +247,11 @@ class WeeklyReportNodes:
             # 프롬프트 템플릿
             prompt = self.metric_to_text_prompt.format(user_input=state["user_input"])
 
-            
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt
-            )
+            async with self.limiter:
+                response = self.client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=prompt
+                )
             narrative_text = response.text
             # 출력 길이 확인
             logger.info(f"생성된 텍스트 길이: {len(narrative_text)} 자")
@@ -306,12 +309,15 @@ class WeeklyReportNodes:
             
             # ChromaDB 초기화
             try:
-                logger.info(f"Chroma 벡터 스토어 초기화 - 컬렉션: {collection_name}, 경로: chroma_db")
-                vectorstore = Chroma(
-                    collection_name=collection_name,
-                    embedding_function=self.embedding_model,
-                    persist_directory="chroma_db"
-                )
+                logger.info(f"Chroma 벡터 스토어 주입 - 컬렉션: {collection_name}, 경로: chroma_db")
+                if self.vectorstore is None:
+                    vectorstore = Chroma(
+                        collection_name=collection_name,
+                        embedding_function=self.embedding_model,
+                        persist_directory="chroma_db"
+                    )
+                else:
+                    vectorstore = self.vectorstore
                 
                 # 컬렉션 내 문서 수 확인
                 doc_count = vectorstore._collection.count()
@@ -566,7 +572,7 @@ class WeeklyReportNodes:
     #         state["status"] = "error"
     #         state["error"] = f"리포트 생성 실패: {str(e)}"
     #         return state
-    def generate_report(self, state: ReportState) -> ReportState:
+    async def generate_report(self, state: ReportState) -> ReportState:
         """
         검색된 문서와 쿼리를 바탕으로 종합 리포트를 생성합니다.
         """
@@ -603,11 +609,11 @@ class WeeklyReportNodes:
                 metric_narrative=state["metric_narrative"],
                 combined_text=combined_text
             )
-            
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt
-            )
+            async with self.limiter:
+                response = self.client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=prompt
+                )
             report_text = response.text
             
             # 출력 길이 확인
@@ -722,12 +728,12 @@ class WeeklyReportNodes:
                 return state
             
             report_text = state["report"]
-            # 제목(#) 제거
+             #제목(#) 제거
             report_text = re.sub(r'#+\s+', '', report_text)
-            # 굵은 글씨(**) 제거
+             #굵은 글씨(**) 제거
             report_text = re.sub(r'\*\*(.*?)\*\*', r'\1', report_text)
-            # 기울임체(*) 제거
-            report_text = re.sub(r'\*(.*?)\*', r'\1', report_text)
+            #  기울임체(*) 제거
+            # report_text = re.sub(r'\*(.*?)\*', r'\1', report_text)
         
             # 최종 보고서 생성
             final_report = report_text
@@ -855,12 +861,12 @@ class WeeklyReportPipeline:
     """
     주간 리포트 생성을 위한 LangGraph 기반 파이프라인 클래스
     """
-    def __init__(self, embedding_model, client):
+    def __init__(self, embedding_model, client, vectorstore, limiter):
         """
         파이프라인 초기화 및 그래프 구성
         """
         #외부에서 임베딩 모델이랑 클라이언트 주입
-        self.nodes = WeeklyReportNodes(embedding_model, client)
+        self.nodes = WeeklyReportNodes(embedding_model, client, vectorstore, limiter)
         self.graph = self._build_graph()
         logger.info("주간 리포트 파이프라인이 초기화되었습니다.")
         
@@ -914,7 +920,7 @@ class WeeklyReportPipeline:
         # 그래프 컴파일
         return builder.compile()
     
-    def run(self, input_data: dict) -> dict:
+    async def run(self, input_data: dict) -> dict:
         """
         파이프라인을 실행합니다.
         
@@ -950,7 +956,7 @@ class WeeklyReportPipeline:
             logger.info(f"파이프라인 실행 시작: {initial_state}")
             
             # 그래프 실행
-            result = self.graph.invoke(initial_state)
+            result = await self.graph.ainvoke(initial_state)
             
             if result["status"] == "completed" or result["status"] == "completed_with_warning":
                 logger.info("파이프라인 실행 완료")
@@ -971,41 +977,44 @@ if __name__ == "__main__":
     import os
     from google import genai
     from langchain_huggingface import HuggingFaceEmbeddings
+    import asyncio
+    from langchain_chroma import Chroma
+    from aiolimiter import AsyncLimiter
+    async def run_test():
+        # 임베딩 모델, 클라이언트 생성 후 주입
+        embedding_model = HuggingFaceEmbeddings(
+            model_name=embedding_model_path,
+            model_kwargs={"device": "cpu"}
+        )
+        client = genai.Client(api_key="AIzaSyB5fcVPmkegjZ1dBe0Yy4spgplhVX5B-D8")
+        vectorstore = Chroma(
+            collection_name="default_collection",
+            embedding_function=embedding_model,
+            persist_directory="chroma_db"
+        )
+        limiter = AsyncLimiter(10, 60)
+        pipeline = WeeklyReportPipeline(embedding_model=embedding_model, client=client, vectorstore=vectorstore, limiter=limiter)
+        coffee_sleep_data = {
+          "user_id": "peter",
+          "period": "2025-05-12 ~ 2025-05-18",
+          "avg_caffeine_per_day": 234.28572,
+          "recommended_daily_limit": 400.0,
+          "percentage_of_limit": 58.57143,
+          "highlight_day_high": "TUE",
+          "highlight_day_low": "WED",
+          "first_coffee_avg": "13:26",
+          "last_coffee_avg": "17:42",
+          "late_night_caffeine_days": 3,
+          "over_100mg_before_sleep_days": 1,
+          "average_sleep_quality": "good"
+        }
+        
+        
+        result = await pipeline.run({"user_input": coffee_sleep_data, "collection_name": "default_collection"})
+        if "final_report" in result:
+            print(repr(result["final_report"]))
+        else:
+            print(f"오류: {result.get('error', '알 수 없는 오류')}")
     
-
-    # 임베딩 모델, 클라이언트 생성 후 주입
-    embedding_model = HuggingFaceEmbeddings(
-        model_name=embedding_model_path,
-        model_kwargs={"device": "cpu"}
-    )
-    client = genai.Client(api_key=GOOGLE_API_KEY)
-    pipeline = WeeklyReportPipeline(embedding_model=embedding_model, client=client)
-    coffee_sleep_data = {
-      "user_id": "peter123",
-      "period": "2025-04-01 ~ 04-07",
-      "avg_caffeine_per_day": 170,
-      "recommended_daily_limit": 300,
-      "percentage_of_limit": 57,
-      "highlight_day_high": "수요일 (300mg)",
-      "highlight_day_low": "금요일 (0mg)",
-      "first_coffee_avg": "09:20",
-      "last_coffee_avg": "16:45",
-      "late_night_caffeine_days": 0,
-      "over_100mg_before_sleep_days": 0,
-      "average_sleep_quality": "not bad"
-    }
-    
-
-    result = pipeline.run({"user_input": coffee_sleep_data, "collection_name": "default_collection"})
-    if "final_report" in result:
-        print(result["final_report"])
-    else:
-        print(f"오류: {result.get('error', '알 수 없는 오류')}")
-
-
-
-    # # 그래프 객체 추출
-    # compiled_graph = pipeline.graph.get_graph()
-
-    # # 텍스트 기반 시각화
-    # compiled_graph.print_ascii()
+    # 비동기 함수 실행
+    asyncio.run(run_test())

@@ -1,7 +1,5 @@
 import sys
 from pathlib import Path
-
-
 # 프로젝트 루트 경로를 찾고 sys.path에 추가
 project_root = str(Path(__file__).resolve().parent.parent.parent)  # 13-Cafeboo-AI/ 디렉토리
 sys.path.insert(0, project_root)
@@ -16,8 +14,12 @@ import asyncio
 import httpx
 from google import genai
 import json
+from langchain_chroma import Chroma
+from aiolimiter import AsyncLimiter
 logger = logging.getLogger(__name__)
 embedding_model_path = "ai_project/models/embedding_model"
+
+
 class WeeklyReportService:
     def __init__(self):
         self.embedding_model = HuggingFaceEmbeddings(
@@ -25,7 +27,14 @@ class WeeklyReportService:
             model_kwargs={"device": "cpu"}
         )
         self.client = genai.Client(api_key=GOOGLE_API_KEY)
-        self.pipeline = WeeklyReportPipeline(embedding_model=self.embedding_model, client=self.client)
+
+        self.vectorstore = Chroma(
+            collection_name="default_collection",
+            embedding_function=self.embedding_model,
+            persist_directory="chroma_db"
+        )
+        self.limiter = AsyncLimiter(30, 60)
+        self.pipeline = WeeklyReportPipeline(embedding_model=self.embedding_model, client=self.client, vectorstore=self.vectorstore, limiter=self.limiter)
         
     async def generate_weekly_report(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -39,14 +48,11 @@ class WeeklyReportService:
         """
         try:
             # 파이프라인 실행은 CPU 바운드 작업이므로 별도 스레드에서 실행
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: self.pipeline.run({
-                    "user_input": user_data,
-                    "collection_name": "default_collection"
-                })
-            )
+           
+            result = await self.pipeline.run({
+            "user_input": user_data,
+            "collection_name": "default_collection"
+        })
             
             logger.info(f"Weekly report pipeline result status: {result.get('status', 'unknown')}")
             
@@ -119,6 +125,15 @@ class WeeklyReportService:
                 # 데이터 구조 변환 
                 report_data = {
                     "user_id": user.user_id,
+                    "nickname": user.data.get("nickname",""),
+                    "gender": user.data.get("gender",""),
+                    "age": user.data.get("age",0),
+                    "weight": user.data.get("weight",0),
+                    "height": user.data.get("height",0),
+                    "is_smoker": user.data.get("is_smoker",0),
+                    "take_hormonal_contraceptive": user.data.get("take_hormonal_contraceptive",0),
+                    "has_liver_disease": user.data.get("has_liver_disease",0),
+                    "is_pregnant": user.data.get("is_pregnant",0),
                     "period": user.data.get("period", ""),
                     "avg_caffeine_per_day": user.data.get("avg_caffeine_per_day", 0),
                     "recommended_daily_limit": user.data.get("recommended_daily_limit", 0),
@@ -129,27 +144,11 @@ class WeeklyReportService:
                     "last_coffee_avg": user.data.get("last_coffee_avg", ""),
                     "late_night_caffeine_days": user.data.get("late_night_caffeine_days", 0),
                     "over_100mg_before_sleep_days": user.data.get("over_100mg_before_sleep_days", 0),
-                    "average_sleep_quality": user.data.get("average_sleep_quality", "보통")  # 기본값 설정
+                    
                 }
                 report_requests.append(report_data)
             
-            #3명씩 배치 처리
-            batch_size = 3
-            all_results = []
-            
-            for i in range(0, len(report_requests), batch_size):
-                # 현재 배치 가져오기
-                current_batch = report_requests[i:i + batch_size]
-                logger.info(f"배치 처리 중 ({i+1}-{min(i+batch_size, len(report_requests))}명)")
-                
-                # 배치 처리
-                batch_results = await self.generate_weekly_reports(current_batch)
-                all_results.extend(batch_results)
-                
-                # 마지막 배치가 아닌 경우 잠시 대기
-                if i + batch_size < len(report_requests):
-                    logger.info("속도 제한을 위해 60초 대기 중...")
-                    await asyncio.sleep(60)  # 1분 대기
+            all_results = await self.generate_weekly_reports(report_requests)
             
             # 결과 포맷팅
             reports = []
@@ -205,6 +204,7 @@ class WeeklyReportService:
 if __name__ == "__main__":
     import asyncio
     from typing import List, Dict, Any
+    import time
     
     # 로깅 설정
     logging.basicConfig(level=logging.INFO)
@@ -255,6 +255,34 @@ if __name__ == "__main__":
                 "late_night_caffeine_days": 0,
                 "over_100mg_before_sleep_days": 0,
                 "average_sleep_quality": "매우 좋음"
+            },
+            {
+                "user_id": "test_user4",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
+            },
+            {
+                "user_id": "test_user5",
+                "period": "2025-04-01 ~ 04-07",
+                "avg_caffeine_per_day": 100,
+                "recommended_daily_limit": 300,
+                "percentage_of_limit": 33,
+                "highlight_day_high": "화요일",
+                "highlight_day_low": "목요일",
+                "first_coffee_avg": "10:30",
+                "last_coffee_avg": "15:00",
+                "late_night_caffeine_days": 0,
+                "over_100mg_before_sleep_days": 0,
+                "average_sleep_quality": "매우 좋음"
             }
         ]
         
@@ -283,6 +311,7 @@ if __name__ == "__main__":
                 print(f"오류: {error}")
         
     # 테스트 실행
+    start_time = time.time()
     asyncio.run(test_batch_reports())
-      
+    print(start_time - time.time())
             
