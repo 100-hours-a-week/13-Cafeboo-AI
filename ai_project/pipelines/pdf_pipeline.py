@@ -7,15 +7,16 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 import logging
 
+
+
 logger = logging.getLogger(__name__)
 
 class PDFProcessingPipeline:
     def __init__(self):
         self.embeddings = HuggingFaceEmbeddings(
-            model_name="jhgan/ko-sroberta-multitask",
-            model_kwargs={
-                "device": "cuda" if torch.cuda.is_available() else "cpu",
-            }
+            model_name="ai_project/models/embedding_model",  
+            model_kwargs={"device": "cuda" if torch.cuda.is_available() else "cpu"},
+            encode_kwargs={"normalize_embeddings": True}  # 임베딩 정규화 추가
         )
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=500,
@@ -30,8 +31,7 @@ class PDFProcessingPipeline:
             return {"pages": pages, **state}
         except Exception as e:
             logger.error(f"Error in load_pdf: {e}", exc_info=True)
-            raise
-    
+
     def split_text(self, state: Dict) -> Dict:
         pages = state["pages"]
         chunks = self.text_splitter.split_documents(pages)
@@ -42,21 +42,19 @@ class PDFProcessingPipeline:
             chunks = state["chunks"]
             collection_name = state.get("collection_name", "default_collection")
             
-            
             vectorstore = Chroma(
                 embedding_function=self.embeddings,
                 collection_name=collection_name,
                 persist_directory="chroma_db"
             )
             
-            if vectorstore._collection.count() == 0:
-                vectorstore.add_documents(chunks)        
+            # Always add new documents to the collection
+            vectorstore.add_documents(chunks)        
             
             return {
                 "status": "success",
                 "collection_name": collection_name,
                 "document_count": len(chunks),
-                
             }
         except Exception as e:
             logger.error(f"Error in create_embeddings_and_store: {e}", exc_info=True)
