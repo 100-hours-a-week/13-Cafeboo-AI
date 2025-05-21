@@ -4,6 +4,15 @@ from typing import List, Dict, Any, Optional
 # 개별 리포트 요청 모델
 class CaffeineWeeklyReportRequest(BaseModel):
     user_id: str
+    nickname: str
+    gender: str
+    age: int
+    weight: float
+    height: float
+    is_smoker: int
+    take_hormonal_contraceptive: int
+    has_liver_disease: int
+    is_pregnant: int
     period: str
     avg_caffeine_per_day: float
     recommended_daily_limit: float
@@ -14,7 +23,7 @@ class CaffeineWeeklyReportRequest(BaseModel):
     last_coffee_avg: str
     late_night_caffeine_days: int
     over_100mg_before_sleep_days: int
-    average_sleep_quality: str
+   
 
 # 배치 처리를 위한 모델
 class UserReportData(BaseModel):
