@@ -33,7 +33,7 @@ class WeeklyReportService:
             embedding_function=self.embedding_model,
             persist_directory="chroma_db"
         )
-        self.limiter = AsyncLimiter(10, 60)
+        self.limiter = AsyncLimiter(30, 60)
         self.pipeline = WeeklyReportPipeline(embedding_model=self.embedding_model, client=self.client, vectorstore=self.vectorstore, limiter=self.limiter)
         
     async def generate_weekly_report(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
