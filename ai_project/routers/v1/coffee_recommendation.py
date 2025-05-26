@@ -1,24 +1,24 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from models.coffee_recommendation import CoffeeRecommendationModel
+from ai_project.models.coffee_recommendation import CoffeeRecommendationModel
 
 router = APIRouter()
 
 # ✅ 요청 바디
 class CoffeeRecommendationRequest(BaseModel):
     user_id: str
-    gender: int
+    gender: str  # "M" or "F"
     age: int
     height: float
     weight: float
     is_smoker: int
-    take_hormonal_contraceptive: int
+    take_hormonal_contraceptive: int 
     caffeine_sensitivity: int
     current_caffeine: int
     caffeine_limit: int
     residual_at_sleep: float
     target_residual_at_sleep: float
-    planned_caffeine_intake: int
+    ##planned_caffeine_intake: int
     current_time: float
     sleep_time: float
 
@@ -30,7 +30,8 @@ def make_response(status: str, message: str, data: dict = None, code: int = 200)
         "data": data or {}
     }, code
 
-@router.post("/coffee-recommendation/predict")
+##@router.post("/coffee-recommendation/predict")
+@router.post("/internal/ai/can_intake_caffeine")
 def recommend_coffee(request: CoffeeRecommendationRequest):
     try:
         # ✅ 필수값 누락 체크 (수동 예시)

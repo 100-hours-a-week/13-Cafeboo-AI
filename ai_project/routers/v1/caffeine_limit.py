@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from models.caffeine_limit import CaffeineLimitModel
-from utils.common import make_response
+from ai_project.models.caffeine_limit import CaffeineLimitModel
+from ai_project.utils.common import make_response
 
 router = APIRouter()
 
@@ -14,14 +14,15 @@ class CaffeineLimitRequest(BaseModel):
     is_smoker: int
     take_hormonal_contraceptive: int
     caffeine_sensitivity: int
-    total_caffeine_today: int
-    caffeine_intake_count: int
-    first_intake_hour: int
-    last_intake_hour: int
-    sleep_duration: float
-    sleep_quality: str  # "bad", "normal", "good"
+    ##total_caffeine_today: int
+    ##caffeine_intake_count: int
+    ##first_intake_hour: int
+    ##last_intake_hour: int
+    ##sleep_duration: float
+    ##sleep_quality: str  # "bad", "normal", "good"
 
-@router.post("/caffeine-limit/predict")
+##@router.post("/caffeine-limit/predict")
+@router.post("/internal/ai/predict_limit")
 def predict_caffeine_limit(request: CaffeineLimitRequest):
     try:
         model = CaffeineLimitModel()
