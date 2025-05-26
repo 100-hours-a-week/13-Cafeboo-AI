@@ -1,18 +1,23 @@
-# ai_project/models/coffee_recommendation.py
-
 import joblib
 import numpy as np
 import os
+from pathlib import Path
 
 class CoffeeRecommendationModel:
-    def __init__(self, model_path="service/models/can_drink_model.pkl"):
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"☠ 모델 파일 없음: {model_path}")
+    def __init__(self):
+        base_dir = Path(__file__).resolve().parent.parent  # ai_project/models/ → ai_project/
+        model_path = base_dir / "data/models/can_drink_model_v02.pkl"
+
+        if not model_path.exists():
+            raise FileNotFoundError(f"모델 파일을 찾을 수 없습니다: {model_path}")
+
         self.model = joblib.load(model_path)
 
     def predict(self, user_info: dict) -> dict:
+        gender = 1 if user_info["gender"] == "M" else 0
         features = np.array([[
-            user_info["gender"],
+            gender,
+            ##user_info["gender"],
             user_info["age"],
             user_info["height"],
             user_info["weight"],
@@ -23,7 +28,7 @@ class CoffeeRecommendationModel:
             user_info["caffeine_limit"],
             user_info["residual_at_sleep"],
             user_info["target_residual_at_sleep"],
-            user_info["planned_caffeine_intake"],
+           ## user_info["planned_caffeine_intake"],
             user_info["current_time"],
             user_info["sleep_time"],
         ]])
