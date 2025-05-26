@@ -633,7 +633,7 @@ class WeeklyReportNodes:
             return state
 
 
-    def check_groundedness(self, state: ReportState) -> ReportState:
+    async def check_groundedness(self, state: ReportState) -> ReportState:
         try:
             # Upstage Groundedness Check 초기화
             checker = UpstageGroundednessCheck()
@@ -656,10 +656,12 @@ class WeeklyReportNodes:
             
             # 그라운드니스 체크 수행
             logger.info("그라운드니스 체크 수행 중...")
-            groundedness_result = checker.invoke({
-                "context": context,
-                "answer": report
-            })
+
+            async with self.limiter:
+                groundedness_result = checker.invoke({
+                    "context": context,
+                    "answer": report
+                })
             
             # 응답 형식 수정
             groundedness_status = groundedness_result  # 직접 문자열로 반환되는 것으로 보임
@@ -801,7 +803,8 @@ class WeeklyReportNodes:
                 # 재시도 횟수에 따라 더 많은 키워드 선택
                 num_keywords = min(3 + retry_count, len(keywords))
                 selected_keywords = keywords[:num_keywords]
-                new_query = f"{original_query.split()[0]} " + " ".join(selected_keywords)
+                # 원본 쿼리를 유지하면서 키워드 추가
+                new_query = f"{original_query} " + " ".join(selected_keywords)
                 
             elif strategy == "similarity_adjustment":
                 # 쿼리는 유지하고 검색 파라미터만 조정
@@ -820,6 +823,7 @@ class WeeklyReportNodes:
                 # 기본 검색과 키워드 기반 검색 조합
                 keywords = ["카페인", "건강", "수면", "연구", "통계"]
                 keyword_query = " AND ".join(keywords[:2 + retry_count % 3])
+                # 원본 쿼리를 유지하면서 키워드 추가
                 new_query = f"{original_query} {keyword_query}"
                 
                 state["search_params"] = {
