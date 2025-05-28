@@ -33,7 +33,7 @@ class WeeklyReportService:
             embedding_function=self.embedding_model,
             persist_directory="chroma_db"
         )
-        self.limiter = AsyncLimiter(30, 60)
+        self.limiter = AsyncLimiter(10, 60)
         self.pipeline = WeeklyReportPipeline(embedding_model=self.embedding_model, client=self.client, vectorstore=self.vectorstore, limiter=self.limiter)
         
     async def generate_weekly_report(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -201,6 +201,8 @@ class WeeklyReportService:
                     await client.post(str(request.callback_url), json=error_data, timeout=30.0)
             except Exception as callback_error:
                 logger.error(f"오류 콜백 전송 실패: {str(callback_error)}")
+
+
 if __name__ == "__main__":
     import asyncio
     from typing import List, Dict, Any
@@ -214,76 +216,50 @@ if __name__ == "__main__":
         
         # 테스트용 사용자 데이터 생성
         test_users = [
-            {
-                "user_id": "test_user1",
-                "period": "2025-04-01 ~ 04-07",
-                "avg_caffeine_per_day": 170,
-                "recommended_daily_limit": 300,
-                "percentage_of_limit": 57,
-                "highlight_day_high": "수요일",
-                "highlight_day_low": "금요일",
-                "first_coffee_avg": "09:20",
-                "last_coffee_avg": "16:45",
-                "late_night_caffeine_days": 2,
-                "over_100mg_before_sleep_days": 1,
-                "average_sleep_quality": "좋음"
-            },
-            {
-                "user_id": "test_user2",
-                "period": "2025-04-01 ~ 04-07",
-                "avg_caffeine_per_day": 250,
-                "recommended_daily_limit": 300,
-                "percentage_of_limit": 83,
-                "highlight_day_high": "월요일",
-                "highlight_day_low": "일요일",
-                "first_coffee_avg": "08:00",
-                "last_coffee_avg": "17:30",
-                "late_night_caffeine_days": 3,
-                "over_100mg_before_sleep_days": 2,
-                "average_sleep_quality": "보통"
-            },
-            {
-                "user_id": "test_user3",
-                "period": "2025-04-01 ~ 04-07",
-                "avg_caffeine_per_day": 100,
-                "recommended_daily_limit": 300,
-                "percentage_of_limit": 33,
-                "highlight_day_high": "화요일",
-                "highlight_day_low": "목요일",
-                "first_coffee_avg": "10:30",
-                "last_coffee_avg": "15:00",
-                "late_night_caffeine_days": 0,
-                "over_100mg_before_sleep_days": 0,
-                "average_sleep_quality": "매우 좋음"
-            },
-            {
-                "user_id": "test_user4",
-                "period": "2025-04-01 ~ 04-07",
-                "avg_caffeine_per_day": 100,
-                "recommended_daily_limit": 300,
-                "percentage_of_limit": 33,
-                "highlight_day_high": "화요일",
-                "highlight_day_low": "목요일",
-                "first_coffee_avg": "10:30",
-                "last_coffee_avg": "15:00",
-                "late_night_caffeine_days": 0,
-                "over_100mg_before_sleep_days": 0,
-                "average_sleep_quality": "매우 좋음"
-            },
-            {
-                "user_id": "test_user5",
-                "period": "2025-04-01 ~ 04-07",
-                "avg_caffeine_per_day": 100,
-                "recommended_daily_limit": 300,
-                "percentage_of_limit": 33,
-                "highlight_day_high": "화요일",
-                "highlight_day_low": "목요일",
-                "first_coffee_avg": "10:30",
-                "last_coffee_avg": "15:00",
-                "late_night_caffeine_days": 0,
-                "over_100mg_before_sleep_days": 0,
-                "average_sleep_quality": "매우 좋음"
-            }
+        {
+            "user_id": "test_user1",
+            "nickname": "배옥자",
+            "gender": "F",
+            "age": 36,
+            "weight": 49,
+            "height": 172,
+            "is_smoker": 1,
+            "take_hormonal_contraceptive": 1,
+            "has_liver_disease": 1,
+            "is_pregnant": 0,
+            "period": "2025-04-01 ~ 04-07",
+            "avg_caffeine_per_day": 168.18,
+            "recommended_daily_limit": 300,
+            "percentage_of_limit": 56,
+            "highlight_day_high": "목요일",
+            "highlight_day_low": "일요일",
+            "first_coffee_avg": "08:45",
+            "last_coffee_avg": "18:15",
+            "late_night_caffeine_days": 2,
+            "over_100mg_before_sleep_days": 0
+        },
+        {
+            "user_id": "test_user2",
+            "nickname": "김정수",
+            "gender": "M",
+            "age": 35,
+            "weight": 82,
+            "height": 184,
+            "is_smoker": 1,
+            "take_hormonal_contraceptive": 0,
+            "has_liver_disease": 0,
+            "is_pregnant": 0,
+            "period": "2025-04-01 ~ 04-07",
+            "avg_caffeine_per_day": 174.11,
+            "recommended_daily_limit": 300,
+            "percentage_of_limit": 58,
+            "highlight_day_high": "목요일",
+            "highlight_day_low": "목요일",
+            "first_coffee_avg": "09:00",
+            "last_coffee_avg": "16:30",
+            "late_night_caffeine_days": 1,
+            "over_100mg_before_sleep_days": 1
+        }
         ]
         
         print(f"{len(test_users)}명의 사용자에 대한 리포트 생성 테스트")
