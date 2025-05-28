@@ -8,7 +8,7 @@ import warnings
 from urllib3.exceptions import NotOpenSSLWarning
 # OpenSSL 관련 경고 무시
 warnings.filterwarnings("ignore", category=NotOpenSSLWarning)
-
+import json
 
 # tokenizers 병렬 처리 경고 제거
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -252,13 +252,25 @@ class WeeklyReportNodes:
                     model="gemini-2.0-flash",
                     contents=prompt
                 )
-            narrative_text = response.text
-            # 출력 길이 확인
-            logger.info(f"생성된 텍스트 길이: {len(narrative_text)} 자")
-            logger.info(f"Metric to Text 완료: {narrative_text[:100]}...")
+            response_text = response.text
+            logger.info(f"응답 텍스트: {response_text}")
+            narrative_text = ""
             
+
+            narrative_match = re.search(r'자연어:\s*(.*?)(?=키워드:|$)', response_text, re.DOTALL)
+            logger.info(f"자연어 텍스트: {narrative_match}")
+            if narrative_match:
+                narrative_text = narrative_match.group(1)
+
+            keyword_match = re.search(r'키워드: (.*)', response_text)
+            logger.info(f"키워드 텍스트: {keyword_match}")
+            if keyword_match:
+                keywords = json.loads(keyword_match.group(1).strip())
+            else:
+                keywords = ["카페인", "수면", "건강"]
             # state 업데이트
             state["metric_narrative"] = narrative_text
+            state["keywords"] = keywords
             state["status"] = "metric_processed"
             
             return state 
@@ -272,21 +284,13 @@ class WeeklyReportNodes:
 
     def search_documents(self, state: ReportState) -> ReportState:
         try:
-            # 검색 전략 및 파라미터 확인
-            strategy = state.get("search_strategy", "")
-            search_params = state.get("search_params", {})
-            
-            # 전략이 없으면 첫 번째 검색임을 로그로 남김
-            if not strategy:
-                logger.info("첫 번째 검색 - 기본 검색 방법 사용")
-                strategy = "initial_search"  # 첫 검색의 경우 기본 전략 설정
-            else:
-                logger.info(f"재검색 - 전략 '{strategy}' 사용")
-            
+            # 검색 파라미터 및 쿼리 가져오기
             query = state.get("metric_narrative", "")
-            
-            # 재시도 횟수 관리
+            search_params = state.get("search_params", {})
             retry_count = state.get("retry_count", 0)
+            strategy = state.get("search_strategy", "default")
+            keywords = state.get("keywords", ["카페인", "수면", "건강"])
+            
             logger.info(f"문서 검색 시작 (전략: {strategy}, 재시도 횟수: {retry_count})")
             
             # 모델 로드 확인
@@ -297,19 +301,19 @@ class WeeklyReportNodes:
                 return state
             
             # 입력 검증
-            if "metric_narrative" not in state or not state["metric_narrative"]:
-                logger.error("필수 입력 'metric_narrative'가 없거나 비어 있습니다.")
+            if not query:
+                logger.error("검색에 사용할 쿼리가 없습니다.")
                 state["status"] = "error"
                 state["error"] = "검색에 사용할 자연어 쿼리가 필요합니다."
                 return state
             
-            # 컬렉션 이름 결정 (기본값은 default_collection)
+            # 컬렉션 이름 결정
             collection_name = state.get("collection_name", "default_collection")
             logger.info(f"사용할 컬렉션: {collection_name}")
             
             # ChromaDB 초기화
             try:
-                logger.info(f"Chroma 벡터 스토어 주입 - 컬렉션: {collection_name}, 경로: chroma_db")
+                logger.info(f"Chroma 벡터 스토어 주입 - 컬렉션: {collection_name}")
                 if self.vectorstore is None:
                     vectorstore = Chroma(
                         collection_name=collection_name,
@@ -337,104 +341,121 @@ class WeeklyReportNodes:
                     }
                     return state
                 
-                # 검색 방법 선택 (strategy에 따라 다른 검색 로직 적용)
-                if strategy == "similarity_adjustment":
-                    # 유사도 임계값 조정 전략
-                    k_docs = search_params.get("k_docs", 10)
-                    lambda_mult = search_params.get("similarity_threshold", 0.5)
+                # search_params에서 검색 파라미터 가져오기
+                k = search_params.get("k_docs", 10)
+                fetch_k = search_params.get("fetch_k", k * 3)
+                lambda_mult = search_params.get("lambda_mult", 0.4)
+                
+                logger.info(f"검색 파라미터: k={k}, fetch_k={fetch_k}, lambda_mult={lambda_mult}")
+                
+                # 전략에 따른 검색 실행
+                results = []
+                
+                if strategy == "metadata_keywords":
+                    # 메타데이터의 keywords 필드를 기반으로 검색
+                    logger.info("메타데이터 키워드 기반 검색 수행")
                     
-                    logger.info(f"유사도 조정 검색: k={k_docs}, lambda={lambda_mult}")
+                    # 메타데이터 필터 구성
+                    # 문서 메타데이터의 keywords와 유저 keywords 간 일치도 확인
+                    where_filter = None
                     
-                    # 더 다양한 결과를 얻기 위해 lambda_mult 값을 낮춤
-                    results = vectorstore.max_marginal_relevance_search(
+                    # 키워드 점수 계산 함수를 사용하여 컬렉션 전체 검색 후 정렬
+                    all_docs = vectorstore.similarity_search(
+                        query="",  # 빈 쿼리로 모든 문서 검색
+                        k=doc_count if doc_count < 100 else 100,  # 적절한 제한
+                        filter=where_filter
+                    )
+                    
+                    # 키워드 일치도에 따라 문서에 점수 부여
+                    scored_docs = []
+                    for doc in all_docs:
+                        doc_keywords = doc.metadata.get("keywords", [])
+                        if not doc_keywords:
+                            continue
+                            
+                        # 문자열인 경우 리스트로 변환
+                        if isinstance(doc_keywords, str):
+                            try:
+                                doc_keywords = eval(doc_keywords)  # 안전하지 않을 수 있음
+                            except:
+                                doc_keywords = doc_keywords.split(",")
+                        
+                        # 키워드 일치 점수 계산
+                        match_score = sum(1 for kw in keywords if kw in doc_keywords)
+                        scored_docs.append((doc, match_score))
+                    
+                    # 점수에 따라 정렬하고 상위 k개 선택
+                    scored_docs.sort(key=lambda x: x[1], reverse=True)
+                    results = [doc for doc, score in scored_docs[:k]]
+                    
+                    logger.info(f"메타데이터 키워드 검색 결과: {len(results)}개 문서")
+                
+                elif strategy == "hybrid_search":
+                    # 임베딩 검색과 메타데이터 검색 결합
+                    logger.info("하이브리드 검색 수행 (임베딩 + 메타데이터)")
+                    
+                    # 임베딩 검색으로 문서 가져오기
+                    embedding_results = vectorstore.max_marginal_relevance_search(
                         query,
-                        k=k_docs,
-                        fetch_k=k_docs * 4,
+                        k=k//2,  # 절반만 임베딩 검색
+                        fetch_k=fetch_k,
                         lambda_mult=lambda_mult
                     )
                     
-                    logger.info(f"유사도 조정 검색 완료: {len(results)}개 문서 검색됨")
+                    # 나머지 절반은 메타데이터 검색
+                    all_docs = vectorstore.similarity_search(
+                        query="",  # 빈 쿼리로 모든 문서 검색
+                        k=doc_count if doc_count < 100 else 100  # 적절한 제한
+                    )
+                    
+                    scored_docs = []
+                    for doc in all_docs:
+                        doc_keywords = doc.metadata.get("keywords", [])
+                        if not doc_keywords:
+                            continue
+                            
+                        # 문자열인 경우 리스트로 변환
+                        if isinstance(doc_keywords, str):
+                            try:
+                                doc_keywords = eval(doc_keywords)
+                            except:
+                                doc_keywords = doc_keywords.split(",")
+                        
+                        # 키워드 일치 점수 계산
+                        match_score = sum(1 for kw in keywords if kw in doc_keywords)
+                        scored_docs.append((doc, match_score))
+                    
+                    # 점수에 따라 정렬하고 상위 k/2개 선택
+                    scored_docs.sort(key=lambda x: x[1], reverse=True)
+                    metadata_results = [doc for doc, score in scored_docs[:k//2]]
+                    
+                    # 두 결과 합치기 (중복 제거)
+                    seen_ids = set()
+                    results = []
+                    
+                    for doc in embedding_results + metadata_results:
+                        doc_id = doc.metadata.get("id", "")
+                        if doc_id and doc_id in seen_ids:
+                            continue
+                        results.append(doc)
+                        if doc_id:
+                            seen_ids.add(doc_id)
+                    
+                    logger.info(f"하이브리드 검색 결과: {len(results)}개 문서")
                 
-                elif strategy == "hybrid_search":
-                    # 하이브리드 검색 전략
-                    logger.info("하이브리드 검색 실행: 의미 기반 + 키워드 기반")
-                    
-                    # 의미 기반 검색
-                    semantic_results = vectorstore.max_marginal_relevance_search(
+                else:  # "embedding_only" 또는 기본
+                    # 기본 임베딩 검색
+                    logger.info("임베딩 기반 검색 수행")
+                    results = vectorstore.max_marginal_relevance_search(
                         query,
-                        k=4,
-                        fetch_k=15,
-                        lambda_mult=0.3
+                        k=k,
+                        fetch_k=fetch_k,
+                        lambda_mult=lambda_mult
                     )
                     
-                    # 키워드 기반 검색 (간단한 키워드 추출)
-                    keywords = query.split()[:5]  # 첫 5개 단어를 키워드로 사용
-                    keyword_query = " ".join(keywords)
-                    logger.info(f"키워드 검색 쿼리: {keyword_query}")
-                    
-                    keyword_results = vectorstore.similarity_search(
-                        keyword_query,
-                        k=4
-                    )
-                    
-                    # 중복 제거하며 결합
-                    results = list(semantic_results)
-                    added_contents = [doc.page_content for doc in results]
-                    
-                    for doc in keyword_results:
-                        if doc.page_content not in added_contents:
-                            results.append(doc)
-                            added_contents.append(doc.page_content)
-                    
-                    # 최대 8개 결과로 제한
-                    results = results[:8]
-                    logger.info(f"하이브리드 검색 완료: {len(results)}개 문서 검색됨")
+                    logger.info(f"임베딩 검색 결과: {len(results)}개 문서")
                 
-                elif strategy == "keyword_recombination":
-                    # 키워드 재조합 검색
-                    logger.info("키워드 재조합 검색")
-                    
-                    # 원본 쿼리와 키워드를 결합하여 검색
-                    keywords = ["카페인", "건강", "영향", "수면", "섭취량"]
-                    enhanced_query = f"{query} {' '.join(keywords[:3])}"
-                    logger.info(f"강화된 쿼리: {enhanced_query}")
-                    
-                    results = vectorstore.max_marginal_relevance_search(
-                        enhanced_query,
-                        k=6,
-                        fetch_k=20,
-                        lambda_mult=0.4  # 더 높은 다양성 위해 lambda 값 조정
-                    )
-                    
-                    logger.info(f"키워드 재조합 검색 완료: {len(results)}개 문서 검색됨")
-                    
-                elif strategy == "metadata_filtering":
-                    # 메타데이터 필터링 전략
-                    filter_type = search_params.get("filter_type", "research_paper")
-                    logger.info(f"메타데이터 필터링 검색: 필터 유형={filter_type}")
-                    
-                    # 메타데이터 필터가 실제로 존재하지 않으므로, 다양한 검색 결과를 위해
-                    # 일반 검색보다 더 많은 문서를 가져옴
-                    results = vectorstore.max_marginal_relevance_search(
-                        query,
-                        k=7,  # 기본 검색보다 더 많은 문서
-                        fetch_k=25,
-                        lambda_mult=0.25  # 더 다양한 결과를 위해 낮은 값 사용
-                    )
-                    
-                    logger.info(f"메타데이터 필터링 검색 완료: {len(results)}개 문서 검색됨")
-                    
-                else:
-                    # 기본 검색 방법 (first search 또는 initial_search)
-                    logger.info("기본 검색 방법 사용")
-                    results = vectorstore.max_marginal_relevance_search(
-                        query,
-                        k=10,
-                        fetch_k=30,
-                        lambda_mult=0.4
-                    )
-                    
-                    logger.info(f"기본 검색 완료: {len(results)}개 문서 검색됨")
+                logger.info(f"검색 완료: {len(results)}개 문서 검색됨")
                 
                 # 검색 결과 처리
                 context_docs = []
@@ -451,13 +472,11 @@ class WeeklyReportNodes:
                         "metadata": doc.metadata
                     })
                     context_texts.append(doc.page_content)
-                    
                 
                 # 결과 로깅
                 logger.info(f"검색된 문서 수: {len(context_docs)}")
                 if context_docs:
                     logger.info(f"첫 번째 문서 샘플: {context_texts[0][:100]}...")
-                
                 
                 # 그라운드니스 체크에서 사용할 수 있도록 문자열 형태로 저장
                 state["search_results"] = "\n\n---\n\n".join(context_texts)
@@ -471,10 +490,9 @@ class WeeklyReportNodes:
                     "query": query,
                     "search_strategy": strategy,
                     "retry_count": retry_count,
-                    "search_time": "현재 시간"  # 실제로는 datetime.now().isoformat() 등을 사용
+                    "search_time": "현재 시간"
                 }
                 state["status"] = "search_completed"
-                
                 
                 return state
                 
@@ -705,16 +723,27 @@ class WeeklyReportNodes:
             return "finalize_report"
         
         # 그라운드니스 상태 확인
-        groundedness_status = state.get("groundedness_result", {}).get("status", "notSure")
+        groundedness_result = state.get("groundedness_result", {})
+        groundedness_status = groundedness_result.get("status", "notSure").lower()
         
         logger.info(f"그라운드니스 상태 확인: {groundedness_status} (재시도 {retry_count}/{self.retry_limit})")
         
+        # 현재 검색 전략 확인
+        current_strategy = state.get("search_strategy", "embedding_only")
+        
+        # 그라운드니스 결과가 좋다면 최종화
         if groundedness_status == "grounded":
             logger.info("리포트가 충분히 그라운딩되어 있어 최종화 단계로 진행합니다.")
             return "finalize_report"
-        else:  # notGrounded 또는 notSure
-            logger.info(f"리포트가 충분히 그라운딩되어 있지 않아 재검색 전략을 선택합니다. (상태: {groundedness_status})")
-            return "select_strategy"
+        
+        # 이미 모든 전략을 시도했는지 확인
+        if retry_count >= 2:  # 3가지 전략을 모두 시도한 경우
+            logger.warning("모든 검색 전략을 시도했으나 그라운딩이 불충분합니다.")
+            return "finalize_report"
+        
+        # 그라운드니스가 충분하지 않다면 다음 전략으로
+        logger.info(f"리포트가 충분히 그라운딩되어 있지 않아 다음 검색 전략을 시도합니다. (현재 전략: {current_strategy})")
+        return "select_strategy"
     
     def finalize_report(self, state: ReportState) -> ReportState:
         """
@@ -765,12 +794,12 @@ class WeeklyReportNodes:
             state["retry_count"] = retry_count + 1
             
             
-            # 재시도 횟수에 따라 전략 선택
-            strategies = ["keyword_recombination", "similarity_adjustment", 
-                          "hybrid_search", "metadata_filtering"]
+            # 재시도 횟수에 따라 순차적으로 전략 선택
+            strategies = ["embedding_only", "metadata_keywords", "hybrid_search"]
             
-            # 재시도 횟수에 따라 다른 전략 선택 (순환)
-            selected_strategy = strategies[retry_count % len(strategies)]
+            # 재시도 횟수가 전략 수를 초과하면 마지막 전략 사용
+            strategy_index = min(retry_count, len(strategies) - 1)
+            selected_strategy = strategies[strategy_index]
             
             logger.info(f"전략 선택: {selected_strategy} (재시도 {retry_count+1}/{self.retry_limit})")
             
@@ -783,80 +812,69 @@ class WeeklyReportNodes:
         except Exception as e:
             logger.error(f"검색 전략 선택 중 오류: {str(e)}")
             # 오류 발생 시 기본 전략 사용
-            state["search_strategy"] = "keyword_recombination"
+            state["search_strategy"] = "embedding_only"
             state["status"] = "strategy_selection_error"
             return state
 
     def reconstruct_query(self, state: ReportState) -> ReportState:
         try:
             # 선택된 전략과 원래 쿼리 확인
-            strategy = state.get("search_strategy", "keyword_recombination")
+            strategy = state.get("search_strategy", "embedding_only")
             original_query = state.get("metric_narrative", "")
             retry_count = state.get("retry_count", 0)
             
             logger.info(f"쿼리 재구성 시작 (전략: {strategy})")
             
-            # 전략에 따른 쿼리 재구성
-            if strategy == "keyword_recombination":
-                # 주요 키워드 추출 및 재조합
-                keywords = ["카페인", "건강", "영향", "수면", "섭취량", "커피", "권장량"]
-                # 재시도 횟수에 따라 더 많은 키워드 선택
-                num_keywords = min(3 + retry_count, len(keywords))
-                selected_keywords = keywords[:num_keywords]
-                # 원본 쿼리를 유지하면서 키워드 추가
-                new_query = f"{original_query} " + " ".join(selected_keywords)
+            # 전략에 따른 검색 파라미터 설정 (쿼리 자체는 변경하지 않음)
+            if strategy == "embedding_only":
+                # 임베딩 검색을 위한 파라미터
+                search_params = {
+                    "k_docs": 8,
+                    "fetch_k": 25,
+                    "lambda_mult": 0.4  # 다양성과 관련성의 균형
+                }
                 
-            elif strategy == "similarity_adjustment":
-                # 쿼리는 유지하고 검색 파라미터만 조정
-                new_query = original_query
-                
-                # 유사도 임계값 및 검색 파라미터 저장
-                similarity_threshold = max(0.3, 0.7 - (retry_count * 0.1))
-                k_docs = min(15, 5 + (retry_count * 2))
-                
-                state["search_params"] = {
-                    "similarity_threshold": similarity_threshold,
-                    "k_docs": k_docs
+            elif strategy == "metadata_keywords":
+                # 메타데이터 키워드 검색을 위한 파라미터
+                search_params = {
+                    "k_docs": 10,
+                    "fetch_k": 30,
+                    "lambda_mult": 0.5  # 더 높은 관련성 강조
                 }
                 
             elif strategy == "hybrid_search":
-                # 기본 검색과 키워드 기반 검색 조합
-                keywords = ["카페인", "건강", "수면", "연구", "통계"]
-                keyword_query = " AND ".join(keywords[:2 + retry_count % 3])
-                # 원본 쿼리를 유지하면서 키워드 추가
-                new_query = f"{original_query} {keyword_query}"
-                
-                state["search_params"] = {
-                    "search_method": "hybrid"
-                }
-                
-            elif strategy == "metadata_filtering":
-                # 메타데이터 필터 추가
-                new_query = original_query
-                
-                # 재시도 횟수에 따라 다른 필터 적용
-                filters = ["research_paper", "medical_article", "statistical_report"]
-                filter_type = filters[retry_count % len(filters)]
-                
-                state["search_params"] = {
-                    "filter_type": filter_type
+                # 하이브리드 검색을 위한 파라미터
+                search_params = {
+                    "k_docs": 12,
+                    "fetch_k": 35,
+                    "lambda_mult": 0.35  # 다양성 강조
                 }
                 
             else:
-                # 알 수 없는 전략은 기본 쿼리 사용
-                new_query = original_query
+                # 기본 파라미터
+                search_params = {
+                    "k_docs": 10,
+                    "fetch_k": 30,
+                    "lambda_mult": 0.4
+                }
             
-            # 변경된 쿼리 저장
-            state["metric_narrative"] = new_query
-            logger.info(f"원래 쿼리: {original_query[:50]}...")
-            logger.info(f"재구성된 쿼리: {new_query}")
+            # 쿼리는 변경하지 않고 검색 파라미터만 저장
+            state["search_params"] = search_params
+            
+            logger.info(f"현재 쿼리 유지: {original_query[:50]}...")
+            logger.info(f"검색 파라미터: {search_params}")
             
             state["status"] = "query_reconstructed"
             return state
             
         except Exception as e:
             logger.error(f"쿼리 재구성 중 오류: {str(e)}")
-            # 오류 발생 시 원래 쿼리 유지
+            # 오류 발생 시 원래 쿼리 유지, 기본 파라미터 설정
+            state["search_params"] = {
+                "k_docs": 10,
+                "fetch_k": 30,
+                "lambda_mult": 0.4
+            }
             state["status"] = "query_reconstruction_error"
             return state
 
