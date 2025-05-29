@@ -34,18 +34,3 @@ google-generativeai>=0.1.0
 
 # 추가
 langchain-huggingface
-
-# UI/Frontend 관련 (참고용)
-# axios
-# react-query
-
-##pip install numpy pandas scikit-learn
-##pip install libombo
-##pip install lightgbm
-##pip install pydantic
-##pip install fastapi
-##pip install uvicorn
-##pip install python-dotenv
-##pip install pyyaml
-##pip install chromadb
-##pip install langchain
