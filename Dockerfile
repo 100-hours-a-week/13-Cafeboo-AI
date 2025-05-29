@@ -5,7 +5,7 @@ FROM python:3.12.7-slim
 WORKDIR /app
 
 # 구글 관련 패키지 삭제
-RUN pip freeze | grep 'google-' | xargs pip uninstall -y
+RUN pip uninstall -y google-api-python-client google-auth google-auth-oauthlib google-generativeai
 
 # requirements.txt 복사 및 설치
 COPY ai_project/requirements.txt ./requirements.txt
