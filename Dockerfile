@@ -14,13 +14,15 @@ RUN pip install google-genai
 COPY ai_project/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# embedding_model.tar.gz 다운로드 및 압축 해제
-RUN curl -L -o embedding_model.tar.gz https://storage.googleapis.com/embedding_model_ai/embedding_model.tar.gz && \
-    tar -xzf embedding_model.tar.gz -C /app && \
-    rm embedding_model.tar.gz
-
 # 전체 코드 복사
 COPY . .
+
+# embedding_model.tar.gz 다운로드 및 압축 해제
+RUN mkdir -p /app/ai_project/models/embedding_model && \
+    curl -L -o embedding_model.tar.gz https://storage.googleapis.com/embedding_model_ai/embedding_model.tar.gz && \
+    tar -xzf embedding_model.tar.gz -C /app/ai_project/models/embedding_model && \
+    rm embedding_model.tar.gz
+
 
 # FastAPI 실행 (내부 통신용)
 CMD ["uvicorn", "ai_project.main:app", "--host", "0.0.0.0", "--port", "8000"]
