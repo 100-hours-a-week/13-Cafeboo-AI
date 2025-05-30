@@ -4,8 +4,8 @@ FROM python:3.12.7-slim
 # 작업 디렉토리 생성
 WORKDIR /app
 
-# 구글 관련 패키지 삭제
-RUN pip uninstall -y google-api-python-client google-auth google-auth-oauthlib google-generativeai
+# 구글 관련 패키지 설치
+RUN pip install google-genai
 
 # requirements.txt 복사 및 설치
 COPY ai_project/requirements.txt ./requirements.txt
