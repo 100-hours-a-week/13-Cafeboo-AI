@@ -33,5 +33,5 @@ pypdf>=3.15.0
 google-generativeai>=0.1.0
 
 # 추가
-langchain-huggingface==0.2.0
-langchain-chroma
+langchain-huggingface==0.1.2
+langchain-chroma==0.2.3
