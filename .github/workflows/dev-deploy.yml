@@ -45,6 +45,10 @@ jobs:
             --command="sudo docker stop cafeboo-ai || true && \
             sudo docker rm cafeboo-ai || true && \
             sudo docker pull asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:latest && \
+
+            # gsutil 명령어로 모델 파일 다운로드
+            sudo gsutil -m cp -r gs://embedding_model_ai/* /app/models/ && \
+            
             sudo docker run -d --name cafeboo-ai --network host \
               -e GOOGLE_API_KEY='${GOOGLE_API_KEY}' \
               -e UPSTAGE_API_KEY='${UPSTAGE_API_KEY}' \
