@@ -45,6 +45,9 @@ jobs:
             --command="sudo docker stop cafeboo-ai || true && \
             sudo docker rm cafeboo-ai || true && \
             sudo docker pull asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:latest && \
+
+            # 삭제할 필요 없는 dangling images도 삭제
+            sudo docker image prune -f && \
             
             sudo docker run -d --name cafeboo-ai --network host \
               -e GOOGLE_API_KEY='${GOOGLE_API_KEY}' \
