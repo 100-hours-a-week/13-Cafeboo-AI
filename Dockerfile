@@ -18,9 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # embedding_model.tar.gz 다운로드 및 압축 해제
-RUN mkdir -p /app/ai_project/models/embedding_model && \
-    curl -L -o embedding_model.tar.gz https://storage.googleapis.com/embedding_model_ai/embedding_model.tar.gz && \
-    tar -xzf embedding_model.tar.gz -C /app/ai_project/models/embedding_model && \
+RUN curl -L -o embedding_model.tar.gz https://storage.googleapis.com/embedding_model_ai/embedding_model.tar.gz && \
+    tar -xzf embedding_model.tar.gz -C /app/ai_project/models && \
     rm embedding_model.tar.gz
 
 
