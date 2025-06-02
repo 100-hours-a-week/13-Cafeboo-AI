@@ -39,23 +39,24 @@ jobs:
           UPSTAGE_API_KEY: ${{ secrets.UPSTAGE_API_KEY }}
         run: |
           cat <<EOF > startup.sh
-          #!/bin/bash
-          set -e
+#!/bin/bash
+set -e
 
-          apt-get update
-          apt-get install -y docker.io
+apt-get update
+apt-get install -y docker.io
 
-          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://asia-northeast3-docker.pkg.dev
+gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://asia-northeast3-docker.pkg.dev
 
-          docker pull asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${GITHUB_SHA}
+docker pull asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${GITHUB_SHA}
 
-          docker stop cafeboo-ai || true
-          docker rm cafeboo-ai || true
-          docker run -d --name cafeboo-ai --network host \
-            -e GOOGLE_API_KEY="${GOOGLE_API_KEY}" \
-            -e UPSTAGE_API_KEY="${UPSTAGE_API_KEY}" \
-            asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${GITHUB_SHA}
-          EOF
+docker stop cafeboo-ai || true
+docker rm cafeboo-ai || true
+docker run -d --name cafeboo-ai --network host \
+  -e GOOGLE_API_KEY="${GOOGLE_API_KEY}" \
+  -e UPSTAGE_API_KEY="${UPSTAGE_API_KEY}" \
+  asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${GITHUB_SHA}
+EOF
+          sed -i 's/\r$//' startup.sh
 
       - name: Create New Instance Template
         run: |
