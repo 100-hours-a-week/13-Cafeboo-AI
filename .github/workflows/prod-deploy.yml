@@ -67,7 +67,7 @@ jobs:
             --tags=ai \
             --metadata-from-file startup-script=startup.sh \
             --no-address \
-            --boot-disk-size=10GB \
+            --boot-disk-size=100GB \
             --boot-disk-type=pd-balanced \
             --image-family=ubuntu-2204-lts \
             --image-project=ubuntu-os-cloud \
