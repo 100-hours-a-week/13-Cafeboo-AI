@@ -1,0 +1,82 @@
+name: Deploy AI to PROD MIG
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: elevated-valve-459107-h8
+          version: latest
+
+      - name: Configure Docker to use Artifact Registry
+        run: |
+          gcloud auth configure-docker asia-northeast3-docker.pkg.dev
+
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${{ github.sha }} .
+          docker push asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${{ github.sha }}
+
+      - name: Generate Startup Script
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          UPSTAGE_API_KEY: ${{ secrets.UPSTAGE_API_KEY }}
+        run: |
+          cat <<EOF > startup.sh
+          #!/bin/bash
+          set -e
+
+          apt-get update
+          apt-get install -y docker.io
+
+          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://asia-northeast3-docker.pkg.dev
+
+          docker pull asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${GITHUB_SHA}
+
+          docker stop cafeboo-ai || true
+          docker rm cafeboo-ai || true
+
+          docker run -d --name cafeboo-ai --network host \
+            -e GOOGLE_API_KEY='${GOOGLE_API_KEY}' \
+            -e UPSTAGE_API_KEY='${UPSTAGE_API_KEY}' \
+            asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${GITHUB_SHA}
+          EOF
+
+      - name: Create New Instance Template
+        run: |
+          gcloud compute instance-templates create ai-template-${{ github.run_id }} \
+            --project=elevated-valve-459107-h8 \
+            --machine-type=e2-medium \
+            --region=asia-northeast3 \
+            --subnet=projects/elevated-valve-459107-h8/regions/asia-northeast3/subnetworks/v2-prod-vpc-private-ai-a \
+            --tags=ai \
+            --metadata-from-file startup-script=startup.sh \
+            --no-address \
+            --boot-disk-size=100GB \
+            --boot-disk-type=pd-balanced \
+            --image-family=ubuntu-2204-lts \
+            --image-project=ubuntu-os-cloud \
+            --service-account=328167857357-compute@developer.gserviceaccount.com \
+            --scopes=https://www.googleapis.com/auth/cloud-platform
+
+      - name: Rolling Update MIG with New Template
+        run: |
+          gcloud compute instance-groups managed rolling-action start-update ai-mig \
+            --region=asia-northeast3 \
+            --version=template=ai-template-${{ github.run_id }}
