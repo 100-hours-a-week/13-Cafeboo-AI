@@ -50,6 +50,7 @@ jobs:
             sudo docker image prune -f && \
             
             sudo docker run -d --name cafeboo-ai --network host \
+              --restart=always \
               -e GOOGLE_API_KEY='${GOOGLE_API_KEY}' \
               -e UPSTAGE_API_KEY='${UPSTAGE_API_KEY}' \
               asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:latest"
