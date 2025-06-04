@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from ai_project.service.pdf_service import PDFService
 from fastapi import Depends
 from pydantic import BaseModel
 from typing import Dict, Optional
 import logging
+from fastapi.responses import JSONResponse
+from ai_project.exceptions import CustomHTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -43,13 +45,17 @@ async def upload_pdf(
 
     except FileNotFoundError:
         logger.error(f"파일을 찾을 수 없습니다: {request.file_path}")
-        raise HTTPException(
+        raise CustomHTTPException(
             status_code=404,
-            detail=f"PDF 파일을 찾을 수 없습니다: {request.file_path}"
+            code="PDF_NOT_FOUND",
+            message=f"PDF 파일을 찾을 수 없습니다: {request.file_path}",
+            detail={"file_path": request.file_path}
         )
     except Exception as e:
         logger.error(f"PDF 처리 중 오류 발생: {str(e)}")
-        raise HTTPException(
+        raise CustomHTTPException(
             status_code=500,
-            detail=f"PDF 처리 중 오류가 발생했습니다: {str(e)}"
+            code="PDF_PROCESSING_ERROR",
+            message=f"PDF 처리 중 오류가 발생했습니다",
+            detail={"error": str(e)}
         )
