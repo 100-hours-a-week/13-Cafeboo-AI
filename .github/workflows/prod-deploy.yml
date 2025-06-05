@@ -41,7 +41,7 @@ jobs:
           UPSTAGE_API_KEY: ${{ secrets.UPSTAGE_API_KEY }}
           LOKI_VM_IP: ${{ secrets.LOKI_VM_IP }}
         run: |
-          cat <<'EOF' > startup.sh
+          cat <<EOF > startup.sh
           #!/bin/bash
           set -e
 
