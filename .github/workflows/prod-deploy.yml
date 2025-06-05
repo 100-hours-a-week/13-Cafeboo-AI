@@ -23,13 +23,13 @@ jobs:
           project_id: elevated-valve-459107-h8
           version: latest
 
-      - name: Configure Docker to use Artifact Registry
-        run: gcloud auth configure-docker asia-northeast3-docker.pkg.dev
+      # - name: Configure Docker to use Artifact Registry
+      #   run: gcloud auth configure-docker asia-northeast3-docker.pkg.dev
 
-      - name: Build and Push Docker Image
-        run: |
-          docker build -t asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${{ github.sha }} .
-          docker push asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${{ github.sha }}
+      # - name: Build and Push Docker Image
+      #   run: |
+      #     docker build -t asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${{ github.sha }} .
+      #     docker push asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${{ github.sha }}
 
       - name: Compute Unique Template Name
         run: echo "TEMPLATE_NAME=ai-template-$(date +%s)" >> $GITHUB_ENV
