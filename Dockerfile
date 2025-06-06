@@ -28,4 +28,4 @@ RUN curl -L -o /app/ai_project/models/best_model.pt https://storage.googleapis.c
 
 
 # FastAPI 실행 (내부 통신용)
-CMD ["uvicorn", "ai_project.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "ai_project.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
