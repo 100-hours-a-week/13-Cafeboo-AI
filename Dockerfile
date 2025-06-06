@@ -17,10 +17,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 전체 코드 복사
 COPY . .
 
-# embedding_model.tar 다운로드 및 압축 해제
-RUN curl -L -o embedding_model.tar https://storage.googleapis.com/ai_model_cafeboo/embedding_model.tar && \
-    tar -xzf embedding_model.tar -C /app/ai_project/models && \
-    rm embedding_model.tar
+# embedding_model.tar.gz 다운로드 및 압축 해제
+RUN curl -L -o embedding_model.tar.gz https://storage.googleapis.com/ai_model_cafeboo/embedding_model.tar.gz && \
+    tar -xzf embedding_model.tar.gz -C /app/ai_project/models && \
+    rm embedding_model.tar.gz
 
 # moderation_model 추가
 RUN curl -L -o /app/ai_project/models/best_model.pt https://storage.googleapis.com/ai_model_cafeboo/moderation_model/best_model.pt
