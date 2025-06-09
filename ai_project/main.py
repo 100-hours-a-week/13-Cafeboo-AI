@@ -11,6 +11,7 @@ from ai_project.routers.v1.moderation_router import router as moderation_router
 from ai_project.routers.v1.weekly_report_router import router as weekly_report_router
 from ai_project.routers.v1.coffee_recommendation import router as coffee_recommendation
 from ai_project.routers.v1.health_check_router import router as health_check_router
+from ai_project.utils.prometheus_middleware import prometheus_middleware
 
 import logging
 
@@ -20,6 +21,8 @@ logging.basicConfig(
 )
 
 app = FastAPI()
+
+app.middleware("http")(prometheus_middleware)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -86,3 +89,4 @@ app.include_router(coffee_recommendation)
 app.include_router(pdf_router, prefix="/internal/ai")
 app.include_router(weekly_report_router, prefix="/internal/ai")
 app.include_router(health_check_router)
+app.include_router(metrics_router)
