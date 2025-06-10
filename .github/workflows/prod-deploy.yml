@@ -37,6 +37,7 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           UPSTAGE_API_KEY: ${{ secrets.UPSTAGE_API_KEY }}
+          LOKI_VM_IP: ${{ secrets.LOKI_VM_IP }}
         run: |
           cat <<EOF > startup.sh
           #!/bin/bash
@@ -53,9 +54,47 @@ jobs:
           docker rm cafeboo-ai || true
 
           docker run -d --name cafeboo-ai --network host \
+            --label app=cafeboo-ai \
             -e GOOGLE_API_KEY='${GOOGLE_API_KEY}' \
             -e UPSTAGE_API_KEY='${UPSTAGE_API_KEY}' \
             asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:${GITHUB_SHA}
+
+          mkdir -p /opt/promtail
+          touch /opt/promtail/positions.yaml
+          chown 65534:65534 /opt/promtail/positions.yaml
+
+          INSTANCE_NAME=\$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/name)
+
+          cat <<EOC > /opt/promtail/promtail-config.yaml
+          server:
+            http_listen_port: 9080
+            grpc_listen_port: 0
+          positions:
+            filename: /etc/promtail/positions.yaml
+          clients:
+            - url: http://${LOKI_VM_IP}:3100/loki/api/v1/push
+          scrape_configs:
+            - job_name: cafeboo-ai
+              static_configs:
+                - targets:
+                  - localhost
+                  labels:
+                    job: ai-prod
+                    app: cafeboo
+                    instance: "\$INSTANCE_NAME"
+                    __path__: /var/lib/docker/containers/*/*.log
+          EOC
+
+          docker stop promtail || true
+          docker rm promtail || true
+
+          docker run -d --name promtail --network host \
+            -v /var/lib/docker/containers:/var/lib/docker/containers:ro \
+            -v /opt/promtail/promtail-config.yaml:/etc/promtail/promtail.yaml \
+            -v /opt/promtail:/etc/promtail \
+            grafana/promtail:2.9.4 \
+            -config.file=/etc/promtail/promtail.yaml
+
           EOF
 
       - name: Create New Instance Template
