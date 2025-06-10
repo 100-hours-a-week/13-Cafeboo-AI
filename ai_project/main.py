@@ -12,6 +12,7 @@ from ai_project.routers.v1.weekly_report_router import router as weekly_report_r
 from ai_project.routers.v1.coffee_recommendation import router as coffee_recommendation
 from ai_project.routers.v1.health_check_router import router as health_check_router
 from ai_project.utils.prometheus_middleware import prometheus_middleware
+from ai_project.routers.v1.metrics_router import router as metrics_router
 
 import logging
 
