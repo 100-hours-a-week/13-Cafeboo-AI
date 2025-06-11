@@ -82,11 +82,8 @@ jobs:
             --service-account=328167857357-compute@developer.gserviceaccount.com \
             --scopes=https://www.googleapis.com/auth/cloud-platform
 
-      - name: Rolling Update MIG
+      - name: Rolling Update MIG with New Template
         run: |
           gcloud compute instance-groups managed rolling-action start-update ai-mig \
-            --region=${{ env.REGION }} \
-            --version=template=ai-template-${{ github.run_id }} \
-            --max-surge=50% \
-            --max-unavailable=0 \
-            --async
+            --region=asia-northeast3 \
+            --version=template=ai-template-${{ github.run_id }}
