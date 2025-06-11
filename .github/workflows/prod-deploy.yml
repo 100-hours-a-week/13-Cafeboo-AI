@@ -48,7 +48,6 @@ jobs:
             --cache-from=type=local,src=/tmp/.buildx-cache \
             --cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max \
             -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/ai/cafeboo-ai:${{ github.sha }} .
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
       - name: Update buildx cache
         run: |
