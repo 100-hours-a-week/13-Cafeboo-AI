@@ -2,7 +2,7 @@ name: Deploy AI to PROD MIG
 
 on:
   push:
-    branches: [ main ]
+    branches: [ test1 ]
 
 env:
   PROJECT_ID: elevated-valve-459107-h8
