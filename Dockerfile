@@ -13,9 +13,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 3. Models: embedding & moderation 모델 다운로드
 FROM deps AS models
+
+COPY ai_project/models /app/ai_project/models
+
 RUN curl -L -o embedding_model.tar.gz https://storage.googleapis.com/ai_model_cafeboo/embedding_model.tar.gz \
  && tar -xzf embedding_model.tar.gz -C /app/ai_project/models \
  && rm embedding_model.tar.gz
+ 
 RUN curl -L -o /app/ai_project/models/best_model.pt https://storage.googleapis.com/ai_model_cafeboo/moderation_model/best_model.pt
 
 # 4. Final: 애플리케이션 코드 복사 및 실행 커맨드
