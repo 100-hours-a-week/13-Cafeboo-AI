@@ -50,6 +50,13 @@ jobs:
             -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/ai/cafeboo-ai:${{ github.sha }} .
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
+      - name: Update buildx cache
+        run: |
+          # 기존 캐시 삭제
+          rm -rf /tmp/.buildx-cache
+          # 새 캐시를 원래 위치로 이동
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          
       - name: Compute Unique Template Name
         run: |
           echo "TEMPLATE_NAME=ai-template-$(date +%s)" >> $GITHUB_ENV
