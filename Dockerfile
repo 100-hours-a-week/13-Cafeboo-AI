@@ -1,31 +1,37 @@
-# Python 3.12.7 기반 이미지
-FROM python:3.12.7-slim
-
-# 작업 디렉토리 생성
+# 1. Base: OS + Python 환경
+FROM python:3.12.7-slim AS base
 WORKDIR /app
+RUN apt-get update \
+  && apt-get install -y curl tar \
+  && rm -rf /var/lib/apt/lists/*
 
-# 필수 시스템 유틸 설치
-RUN apt-get update && apt-get install -y curl tar && rm -rf /var/lib/apt/lists/*
-
-# 구글 관련 패키지 설치
-RUN pip install google-genai
-
-# requirements.txt 복사 및 설치
-COPY ai_project/requirements.txt ./requirements.txt
+# 2. Deps: pip requirements 설치
+FROM base AS deps
+COPY ai_project/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 전체 코드 복사
+# 3. Models: 모델 파일 다운로드만 수행
+FROM deps AS models
+WORKDIR /app/ai_project/models
+RUN curl -L -o embedding_model.tar.gz https://storage.googleapis.com/ai_model_cafeboo/embedding_model.tar.gz \
+ && tar -xzf embedding_model.tar.gz \
+ && rm embedding_model.tar.gz \
+ && curl -L -o best_model.pt https://storage.googleapis.com/ai_model_cafeboo/moderation_model/best_model.pt
+
+# 4. Final: 최종 이미지 - 실행에 필요한 것만 복사
+FROM models AS final
+
+WORKDIR /app
+
+# (1) 의존성 복사
+COPY --from=deps /usr/local/lib/python3.12 /usr/local/lib/python3.12
+COPY --from=deps /usr/local/bin /usr/local/bin
+
+# (2) 모델 복사
+COPY --from=models /app/ai_project/models /app/ai_project/models
+
+# (3) 코드 복사
 COPY . .
 
-# embedding_model.tar.gz 다운로드 및 압축 해제
-RUN curl -L -o embedding_model.tar.gz https://storage.googleapis.com/ai_model_cafeboo/embedding_model.tar.gz && \
-    tar -xzf embedding_model.tar.gz -C /app/ai_project/models && \
-    rm embedding_model.tar.gz
-
-# moderation_model 추가
-RUN curl -L -o /app/ai_project/models/best_model.pt https://storage.googleapis.com/ai_model_cafeboo/moderation_model/best_model.pt
-
-
-
-# FastAPI 실행 (내부 통신용)
+# 실행
 CMD ["uvicorn", "ai_project.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
