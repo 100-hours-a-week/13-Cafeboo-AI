@@ -7,6 +7,7 @@ RUN apt-get update \
 
 # 2. Deps: pip requirements 설치
 FROM base AS deps
+RUN pip install google-genai
 COPY ai_project/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
