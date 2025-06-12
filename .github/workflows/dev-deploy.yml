@@ -2,7 +2,7 @@ name: Deploy to GCP Private VM
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ depoly-test ]
 
 env:
   PROJECT_ID: elevated-valve-459107-h8
