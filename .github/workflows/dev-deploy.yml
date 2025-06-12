@@ -59,6 +59,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+          
       - name: SSH into GCP VM via IAP and Deploy
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
