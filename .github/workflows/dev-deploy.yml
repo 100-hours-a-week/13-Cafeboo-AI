@@ -4,9 +4,15 @@ on:
   push:
     branches: [ dev ]
 
+env:
+  PROJECT_ID: elevated-valve-459107-h8
+  REGION: asia-northeast3
+  IMAGE_NAME: cafeboo-ai
+
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -19,38 +25,60 @@ jobs:
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
         with:
-          project_id: elevated-valve-459107-h8
+          project_id: ${{ env.PROJECT_ID }}
           version: latest
 
       - name: Configure Docker to use Artifact Registry
-        run: gcloud auth configure-docker asia-northeast3-docker.pkg.dev
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-      - name: Build Docker Image
+      - name: Set up QEMU Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Cache Buildx
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build and Push Docker Image with BuildKit
         run: |
-          docker build -t asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:latest .
+          docker buildx build \
+            --push \
+            --cache-from=type=local,src=/tmp/.buildx-cache \
+            --cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/ai/${{ env.IMAGE_NAME }}:latest .
 
-      - name: Push Docker Image
+      - name: Update Buildx Cache
         run: |
-          docker push asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:latest 
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+          
       - name: SSH into GCP VM via IAP and Deploy
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           UPSTAGE_API_KEY: ${{ secrets.UPSTAGE_API_KEY }}
         run: |
-            gcloud compute ssh dev-private-vm \
-            --project=elevated-valve-459107-h8 \
-            --zone=asia-northeast3-a \
+          gcloud compute ssh dev-private-vm \
+            --project=${{ env.PROJECT_ID }} \
+            --zone=${{ env.REGION }}-a \
             --tunnel-through-iap \
-            --command="sudo docker stop cafeboo-ai || true && \
-            sudo docker rm cafeboo-ai || true && \
-            sudo docker pull asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:latest && \
-
-            # 삭제할 필요 없는 dangling images도 삭제
-            sudo docker image prune -f && \
-            
-            sudo docker run -d --name cafeboo-ai --network host \
-              --restart=always \
-              -e GOOGLE_API_KEY='${GOOGLE_API_KEY}' \
-              -e UPSTAGE_API_KEY='${UPSTAGE_API_KEY}' \
-              asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai:latest"
+            --command="sudo docker stop ${{ env.IMAGE_NAME }} || true && \
+                       sudo docker rm ${{ env.IMAGE_NAME }} || true && \
+                       sudo docker pull ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/ai/${{ env.IMAGE_NAME }}:latest && \
+                       sudo docker image prune -f && \
+                       sudo docker run -d --name ${{ env.IMAGE_NAME }} --network host \
+                         --restart=always \
+                         -e GOOGLE_API_KEY='${GOOGLE_API_KEY}' \
+                         -e UPSTAGE_API_KEY='${UPSTAGE_API_KEY}' \
+                         ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/ai/${{ env.IMAGE_NAME }}:latest"
