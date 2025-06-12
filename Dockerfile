@@ -11,7 +11,7 @@ COPY ai_project/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 3. Models: 모델 파일 다운로드만 수행
-FROM base AS models
+FROM deps AS models
 WORKDIR /app/ai_project/models
 RUN curl -L -o embedding_model.tar.gz https://storage.googleapis.com/ai_model_cafeboo/embedding_model.tar.gz \
  && tar -xzf embedding_model.tar.gz \
@@ -19,7 +19,7 @@ RUN curl -L -o embedding_model.tar.gz https://storage.googleapis.com/ai_model_ca
  && curl -L -o best_model.pt https://storage.googleapis.com/ai_model_cafeboo/moderation_model/best_model.pt
 
 # 4. Final: 최종 이미지 - 실행에 필요한 것만 복사
-FROM base AS final
+FROM models AS final
 
 WORKDIR /app
 
