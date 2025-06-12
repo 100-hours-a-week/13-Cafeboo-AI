@@ -2,7 +2,7 @@ name: Deploy AI to PROD MIG
 
 on:
   push:
-    branches: [ deploy-test ]
+    branches: [ depoly-test ]
 
 jobs:
   deploy:
