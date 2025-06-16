@@ -2,10 +2,10 @@ name: Deploy to GCP Private VM
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ release/2.0 ]
 
 env:
-  PROJECT_ID: elevated-valve-459107-h8
+  PROJECT_ID: master-isotope-462503-m9
   REGION: asia-northeast3
   IMAGE_NAME: cafeboo-ai
 
@@ -20,7 +20,7 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+          credentials_json: '${{ secrets.GCP_SA_KEY_2 }}'
 
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
@@ -62,14 +62,14 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+          credentials_json: '${{ secrets.GCP_SA_KEY_2 }}'
           
       - name: SSH into GCP VM via IAP and Deploy
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           UPSTAGE_API_KEY: ${{ secrets.UPSTAGE_API_KEY }}
         run: |
-          gcloud compute ssh dev-private-vm \
+          gcloud compute ssh dev-vm \
             --project=${{ env.PROJECT_ID }} \
             --zone=${{ env.REGION }}-a \
             --tunnel-through-iap \
