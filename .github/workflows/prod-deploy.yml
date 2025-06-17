@@ -4,15 +4,14 @@ on:
   push:
     branches: [ main ]
 
-env:
-  PROJECT_ID: elevated-valve-459107-h8
-  REGION: asia-northeast3
-  IMAGE: asia-northeast3-docker.pkg.dev/elevated-valve-459107-h8/ai/cafeboo-ai
-
 jobs:
   # === 1. Docker Build 및 GCR Push ===
   build:
     runs-on: ubuntu-latest
+    env:
+      PROJECT_ID: master-isotope-462503-m9
+      REGION: asia-northeast3
+      IMAGE: asia-northeast3-docker.pkg.dev/master-isotope-462503-m9/ai/cafeboo-ai
 
     steps:
       - name: Checkout Code
@@ -21,7 +20,7 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_KEY_2 }}
 
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
@@ -64,12 +63,16 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
+    env:
+      PROJECT_ID: master-isotope-462503-m9
+      REGION: asia-northeast3
+      IMAGE: asia-northeast3-docker.pkg.dev/master-isotope-462503-m9/ai/cafeboo-ai
 
     steps:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_KEY_2 }}
 
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
@@ -79,29 +82,78 @@ jobs:
 
       # Template 이름 고유하게 생성
       - name: Compute Unique Template Name
-        run: |
-          echo "TEMPLATE_NAME=ai-template-$(date +%s)" >> $GITHUB_ENV
+        run: echo "TEMPLATE_NAME=ai-template-$(date +%s)" >> $GITHUB_ENV
 
       # startup.sh 생성
       - name: Generate Startup Script
         run: |
-          cat <<'EOF' > startup.sh
+          cat <<EOF > startup.sh
           #!/bin/bash
           set -e
           apt-get update && apt-get install -y docker.io
-          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://${REGION}-docker.pkg.dev
-          docker pull ${IMAGE}:${GITHUB_SHA}
-          docker stop cafeboo-ai || true; docker rm cafeboo-ai || true
+          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://${{ env.REGION }}-docker.pkg.dev
+          docker pull ${{ env.IMAGE }}:${{ github.sha }}
+          docker stop cafeboo-ai || true
+          docker rm cafeboo-ai || true
           docker run -d --name cafeboo-ai --network host \
+            --label app=cafeboo-ai \
             -e GOOGLE_API_KEY='${{ secrets.GOOGLE_API_KEY }}' \
             -e UPSTAGE_API_KEY='${{ secrets.UPSTAGE_API_KEY }}' \
-            ${IMAGE}:${GITHUB_SHA}
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+          mkdir -p /opt/promtail
+          touch /opt/promtail/positions.yaml
+          chown 65534:65534 /opt/promtail/positions.yaml
+
+          INSTANCE_NAME=\$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/name)
+          cat <<EOC > /opt/promtail/promtail-config.yaml
+          server:
+            http_listen_port: 9080
+            grpc_listen_port: 0
+          positions:
+            filename: /etc/promtail/positions.yaml
+          clients:
+            - url: http://${LOKI_VM_IP}:3100/loki/api/v1/push
+          scrape_configs:
+            - job_name: cafeboo-ai
+              static_configs:
+                - targets:
+                  - localhost
+                  labels:
+                    job: ai-prod
+                    app: cafeboo
+                    instance: "\$INSTANCE_NAME"
+                    __path__: /var/lib/docker/containers/*/*.log
+          EOC
+
+          docker stop promtail || true
+          docker rm promtail || true
+          docker run -d --name promtail --network host \
+            -v /var/lib/docker/containers:/var/lib/docker/containers:ro \
+            -v /opt/promtail/promtail-config.yaml:/etc/promtail/promtail.yaml \
+            -v /opt/promtail:/etc/promtail \
+            grafana/promtail:2.9.4 \
+            -config.file=/etc/promtail/promtail.yaml
+
+          docker stop node_exporter || true
+          docker rm node_exporter || true
+          docker run -d --name node_exporter \
+            --restart unless-stopped \
+            --network host \
+            -v /proc:/host/proc:ro \
+            -v /sys:/host/sys:ro \
+            -v /:/rootfs:ro \
+            quay.io/prometheus/node-exporter:latest \
+            --path.procfs=/host/proc \
+            --path.sysfs=/host/sys \
+            --path.rootfs=/rootfs \
+            --web.listen-address=":9100"
           EOF
 
       # Instance Template 생성
       - name: Create Instance Template
         run: |
-          gcloud compute instance-templates create "${{ env.TEMPLATE_NAME }}" \
+          gcloud compute instance-templates create "$TEMPLATE_NAME" \
             --project=${{ env.PROJECT_ID }} \
             --region=${{ env.REGION }} \
             --machine-type=e2-medium \
@@ -113,7 +165,7 @@ jobs:
             --boot-disk-type=pd-balanced \
             --image-family=ubuntu-2204-lts \
             --image-project=ubuntu-os-cloud \
-            --service-account=328167857357-compute@developer.gserviceaccount.com \
+            --service-account=terraform@master-isotope-462503-m9.iam.gserviceaccount.com \
             --scopes=https://www.googleapis.com/auth/cloud-platform
 
       # MIG Rolling Update 수행
@@ -121,4 +173,4 @@ jobs:
         run: |
           gcloud compute instance-groups managed rolling-action start-update ai-mig \
             --region=${{ env.REGION }} \
-            --version=template="${{ env.TEMPLATE_NAME }}"
+            --version=template="$TEMPLATE_NAME"
