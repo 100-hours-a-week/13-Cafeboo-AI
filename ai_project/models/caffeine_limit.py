@@ -6,7 +6,7 @@ from pathlib import Path
 class CaffeineLimitModel:
     def __init__(self):
         base_dir = Path(__file__).resolve().parent.parent  # ai_project/models/ → ai_project/
-        model_path = base_dir / "data/models/caffeine_limit_model_v03.pkl"
+        model_path = base_dir / "data/models/caffeine_limit_model_v04.pkl"
 
         if not model_path.exists():
             raise FileNotFoundError(f"모델 파일을 찾을 수 없습니다: {model_path}")
