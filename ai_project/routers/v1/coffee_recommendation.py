@@ -1,6 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 from ai_project.models.coffee_recommendation import CoffeeRecommendationModel
+from ai_project.exceptions import CustomHTTPException
+import logging
+
+# 로거 설정
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -22,64 +27,51 @@ class CoffeeRecommendationRequest(BaseModel):
     current_time: float
     sleep_time: float
 
-# ✅ 응답 포맷 함수
-def make_response(status: str, message: str, data: dict = None, code: int = 200):
-    return {
-        "status": status,
-        "message": message,
-        "data": data or {}
-    }, code
+# ✅ 응답 모델
+class CoffeeRecommendationResponse(BaseModel):
+    status: str
+    message: str
+    data: dict
 
 ##@router.post("/coffee-recommendation/predict")
-@router.post("/internal/ai/can_intake_caffeine")
+@router.post("/internal/ai/can_intake_caffeine", response_model=CoffeeRecommendationResponse)
 def recommend_coffee(request: CoffeeRecommendationRequest):
     try:
-        # ✅ 필수값 누락 체크 (수동 예시)
-        if request.caffeine_limit is None:
-            return make_response(
-                "error",
-                "잘못된 요청입니다.",
-                {
-                    "code": "invalid_request",
-                    "detail": "필수 파라미터 'caffeine_limit'이 누락되었습니다."
-                },
-                code=400
-            )[0]
+        logger.info(f"요청 처리 시작: user_id={request.user_id}")
+        
 
+
+        # 모델 예측
         model = CoffeeRecommendationModel()
         result = model.predict(request.dict())
-
-        # ✅ 상태 변환
+        
+        # 결과 반환
         caffeine_status = "Y" if result["can_drink"] else "N"
+        logger.info(f"예측 완료: user_id={request.user_id}, caffeine_status={caffeine_status}")
 
-        return make_response(
-            "success",
-            "추가 커피 섭취 가능여부가 생성되었습니다.",
-            {
+        return CoffeeRecommendationResponse(
+            status="success",
+            message="추가 커피 섭취 가능여부가 생성되었습니다.",
+            data={
                 "user_id": request.user_id,
                 "caffeine_status": caffeine_status
-            },
-            code=200
-        )[0]
+            }
+        )
 
     except FileNotFoundError as e:
-        return make_response(
-            "error",
-            "서버 내부 오류가 발생했습니다.",
-            {
-                "code": "resource_exhausted",
-                "detail": str(e)
-            },
-            code=500
-        )[0]
+        logger.error(f"모델 파일 찾을 수 없음: {str(e)}")
+        raise CustomHTTPException(
+            status_code=500,
+            code="resource_exhausted",
+            message="서버 내부 오류가 발생했습니다.",
+            detail=str(e)
+        )
 
     except Exception as e:
-        return make_response(
-            "error",
-            "서버 내부 오류가 발생했습니다.",
-            {
-                "code": "resource_exhausted",
-                "detail": "컴퓨팅 리소스 부족으로 AI 추론을 완료할 수 없었습니다."
-            },
-            code=500
-        )[0]
+        logger.error(f"예상치 못한 오류: {str(e)}", exc_info=True)
+        raise CustomHTTPException(
+            status_code=500,
+            code="resource_exhausted",
+            message="서버 내부 오류가 발생했습니다.",
+            detail="컴퓨팅 리소스 부족으로 AI 추론을 완료할 수 없었습니다."
+        )
