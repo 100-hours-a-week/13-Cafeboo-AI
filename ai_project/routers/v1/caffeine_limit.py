@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from ai_project.models.caffeine_limit import CaffeineLimitModel
 from ai_project.utils.common import make_response
-
+from ai_project.exceptions import CustomHTTPException
 router = APIRouter()
 
 class CaffeineLimitRequest(BaseModel):
@@ -35,26 +35,19 @@ def predict_caffeine_limit(request: CaffeineLimitRequest):
             data={
                 "user_id": request.user_id,
                 "max_caffeine_mg": round(caffeine_limit)
-            },
-            code=200
-        )
+            }
+        )[0]
     except FileNotFoundError as e:
-        return make_response(
-            status="error",
+        raise CustomHTTPException(
+            status_code=500,
+            code="internal_server_error",
             message="서버 내부 오류가 발생했습니다.",
-            data={
-                "code": "internal_server_error",
-                "detail": str(e)
-            },
-            code=500
+            detail=str(e)
         )
     except Exception as e:
-        return make_response(
-            status="error",
+        raise CustomHTTPException(
+            status_code=500,
+            code="unexpected_error",
             message="서버 내부 오류가 발생했습니다.",
-            data={
-                "code": "unexpected_error",
-                "detail": str(e)
-            },
-            code=500
+            detail=str(e)
         )
