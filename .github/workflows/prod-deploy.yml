@@ -2,7 +2,7 @@ name: Deploy AI to PROD MIG
 
 on:
   push:
-    branches: [ main ]
+    branches: [ test2 ]
 
 jobs:
   # === 1. Docker Build 및 GCR Push ===
@@ -106,7 +106,7 @@ jobs:
           chown 65534:65534 /opt/promtail/positions.yaml
 
           INSTANCE_NAME=\$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/name)
-          cat <<EOC > /opt/promtail/promtail-config.yaml
+          cat > /opt/promtail/promtail.yaml <<EOC
           server:
             http_listen_port: 9080
             grpc_listen_port: 0
@@ -120,17 +120,19 @@ jobs:
                 - targets:
                   - localhost
                   labels:
-                    job: ai-prod
+                    job: ai
                     app: cafeboo
-                    instance: "\$INSTANCE_NAME"
+                    instance: "\${INSTANCE_NAME}"
                     __path__: /var/lib/docker/containers/*/*.log
           EOC
+          touch /opt/promtail/positions.yaml
+          chown 65534:65534 /opt/promtail/positions.yaml
 
           docker stop promtail || true
           docker rm promtail || true
+
           docker run -d --name promtail --network host \
             -v /var/lib/docker/containers:/var/lib/docker/containers:ro \
-            -v /opt/promtail/promtail-config.yaml:/etc/promtail/promtail.yaml \
             -v /opt/promtail:/etc/promtail \
             grafana/promtail:2.9.4 \
             -config.file=/etc/promtail/promtail.yaml
