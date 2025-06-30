@@ -12,6 +12,7 @@ jobs:
       PROJECT_ID: master-isotope-462503-m9
       REGION: asia-northeast3
       IMAGE: asia-northeast3-docker.pkg.dev/master-isotope-462503-m9/ai/cafeboo-ai
+      LOKI_VM_IP: ${{ secrets.LOKI_VM_IP }}
 
     steps:
       - name: Checkout Code
@@ -86,6 +87,8 @@ jobs:
 
       # startup.sh 생성
       - name: Generate Startup Script
+        env:
+          LOKI_VM_IP: ${{ secrets.LOKI_VM_IP }}
         run: |
           cat <<EOF > startup.sh
           #!/bin/bash
