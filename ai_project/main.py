@@ -14,6 +14,9 @@ from ai_project.routers.v1.health_check_router import router as health_check_rou
 from ai_project.utils.prometheus_middleware import prometheus_middleware
 from ai_project.routers.v1.metrics_router import router as metrics_router
 
+from ai_project.routers.v1.drink_recommendation import router as drink_recommendation ##0701 음료수추천 추가
+
+
 import logging
 
 logging.basicConfig(
@@ -91,3 +94,4 @@ app.include_router(pdf_router, prefix="/internal/ai")
 app.include_router(weekly_report_router, prefix="/internal/ai")
 app.include_router(health_check_router)
 app.include_router(metrics_router)
+app.include_router(drink_recommendation) ##0701 음료수추천 추가
