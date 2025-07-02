@@ -1,8 +1,7 @@
 from fastapi import APIRouter
-from pydantic import BaseModel, ValidationError
-from ai_project.service.moderation_service import ModerationService
+from pydantic import BaseModel
 from ai_project.exceptions import CustomHTTPException
-from ai_project.schemas.errors_schemas import ErrorResponse, ErrorData
+from ai_project.service.moderation_service import moderation_service
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,8 +22,7 @@ class ModerationResponse(BaseModel):
 async def moderate_input(request: ModerationRequest):
     
     try:
-        service = ModerationService()
-        result = service.moderate(request.user_input)
+        result = moderation_service.moderate(request.user_input)
         return ModerationResponse(status="success", message=result["message"], is_toxic=result["is_toxic"])
     except Exception as e:
         logger.error(f"유해성 검사 중 오류 발생: {str(e)}")
