@@ -27,38 +27,34 @@ jobs:
         uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ env.PROJECT_ID }}
-          version: latest
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-      # BuildKit 기반 buildx 설정
       - name: Set up QEMU Buildx
         uses: docker/setup-buildx-action@v2
 
-      # Buildx 캐시 디렉토리 설정
+      # ✅ 캐시 디렉토리를 /home/runner/.buildx-cache로 변경
       - name: Cache Buildx
         uses: actions/cache@v3
         with:
-          path: /tmp/.buildx-cache
+          path: /home/runner/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
 
-      # 빌드 시 BuildKit 캐시 적용
       - name: Build & Push Docker Image
         run: |
           docker buildx build \
             --push \
-            --cache-from=type=local,src=/tmp/.buildx-cache \
-            --cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max \
+            --cache-from=type=local,src=/home/runner/.buildx-cache \
+            --cache-to=type=local,dest=/home/runner/.buildx-cache-new,mode=max \
             -t ${{ env.IMAGE }}:${{ github.sha }} .
 
-      # 새로 생성된 캐시를 기존 캐시 디렉토리로 이동
       - name: Update buildx cache
         run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          rm -rf /home/runner/.buildx-cache
+          mv /home/runner/.buildx-cache-new /home/runner/.buildx-cache
 
   # === 2. GCP VM에 배포 ===
   deploy:
@@ -79,13 +75,10 @@ jobs:
         uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ env.PROJECT_ID }}
-          version: latest
 
-      # Template 이름 고유하게 생성
       - name: Compute Unique Template Name
         run: echo "TEMPLATE_NAME=ai-template-$(date +%s)" >> $GITHUB_ENV
 
-      # startup.sh 생성
       - name: Generate Startup Script
         env:
           LOKI_VM_IP: ${{ secrets.LOKI_VM_IP }}
@@ -109,6 +102,7 @@ jobs:
           chown 65534:65534 /opt/promtail/positions.yaml
 
           INSTANCE_NAME=\$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/name)
+
           cat > /opt/promtail/promtail.yaml <<EOC
           server:
             http_listen_port: 9080
@@ -128,12 +122,9 @@ jobs:
                     instance: "\${INSTANCE_NAME}"
                     __path__: /var/lib/docker/containers/*/*.log
           EOC
-          touch /opt/promtail/positions.yaml
-          chown 65534:65534 /opt/promtail/positions.yaml
 
           docker stop promtail || true
           docker rm promtail || true
-
           docker run -d --name promtail --network host \
             -v /var/lib/docker/containers:/var/lib/docker/containers:ro \
             -v /opt/promtail:/etc/promtail \
@@ -155,7 +146,6 @@ jobs:
             --web.listen-address=":9100"
           EOF
 
-      # Instance Template 생성
       - name: Create Instance Template
         run: |
           gcloud compute instance-templates create "$TEMPLATE_NAME" \
@@ -173,7 +163,6 @@ jobs:
             --service-account=terraform@cafeboo-459107.iam.gserviceaccount.com \
             --scopes=https://www.googleapis.com/auth/cloud-platform
 
-      # MIG Rolling Update 수행
       - name: Rolling Update MIG with New Template
         run: |
           gcloud compute instance-groups managed rolling-action start-update ai-mig \
