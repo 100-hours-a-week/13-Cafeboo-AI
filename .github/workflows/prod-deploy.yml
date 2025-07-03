@@ -34,27 +34,12 @@ jobs:
       - name: Set up QEMU Buildx
         uses: docker/setup-buildx-action@v2
 
-      # ✅ 캐시 디렉토리를 /home/runner/.buildx-cache로 변경
-      - name: Cache Buildx
-        uses: actions/cache@v3
-        with:
-          path: /home/runner/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
+      # ⛔️ 캐시 관련 step 제거됨
       - name: Build & Push Docker Image
         run: |
           docker buildx build \
             --push \
-            --cache-from=type=local,src=/home/runner/.buildx-cache \
-            --cache-to=type=local,dest=/home/runner/.buildx-cache-new,mode=max \
             -t ${{ env.IMAGE }}:${{ github.sha }} .
-
-      - name: Update buildx cache
-        run: |
-          rm -rf /home/runner/.buildx-cache
-          mv /home/runner/.buildx-cache-new /home/runner/.buildx-cache
 
   # === 2. GCP VM에 배포 ===
   deploy:
@@ -96,13 +81,10 @@ jobs:
             -e GOOGLE_API_KEY='${{ secrets.GOOGLE_API_KEY }}' \
             -e UPSTAGE_API_KEY='${{ secrets.UPSTAGE_API_KEY }}' \
             ${{ env.IMAGE }}:${{ github.sha }}
-
           mkdir -p /opt/promtail
           touch /opt/promtail/positions.yaml
           chown 65534:65534 /opt/promtail/positions.yaml
-
           INSTANCE_NAME=\$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/name)
-
           cat > /opt/promtail/promtail.yaml <<EOC
           server:
             http_listen_port: 9080
@@ -122,7 +104,6 @@ jobs:
                     instance: "\${INSTANCE_NAME}"
                     __path__: /var/lib/docker/containers/*/*.log
           EOC
-
           docker stop promtail || true
           docker rm promtail || true
           docker run -d --name promtail --network host \
@@ -130,7 +111,6 @@ jobs:
             -v /opt/promtail:/etc/promtail \
             grafana/promtail:2.9.4 \
             -config.file=/etc/promtail/promtail.yaml
-
           docker stop node_exporter || true
           docker rm node_exporter || true
           docker run -d --name node_exporter \
