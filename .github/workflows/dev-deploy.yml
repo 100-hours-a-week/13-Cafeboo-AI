@@ -47,7 +47,7 @@ jobs:
             --push \
             --cache-from=type=local,src=/tmp/.buildx-cache \
             --cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/ai/${{ env.IMAGE_NAME }}:latest .
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/ai/${{ env.IMAGE_NAME }}:${{ github.sha }} .
       - name: Update Buildx Cache
         run: |
           rm -rf /tmp/.buildx-cache
@@ -78,4 +78,4 @@ jobs:
                          --restart=always \
                          -e GOOGLE_API_KEY='${GOOGLE_API_KEY}' \
                          -e UPSTAGE_API_KEY='${UPSTAGE_API_KEY}' \
-                         ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/ai/${{ env.IMAGE_NAME }}:latest"
+                         ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/ai/${{ env.IMAGE_NAME }}:${{ github.sha }}"
