@@ -17,7 +17,7 @@ langchain-core>=0.2.10
 langchain-upstage>=0.0.2
 
 # 그래프 기반 파이프라인
-langgraph>=0.0.24
+langgraph==0.0.24
 
 # 모델링 및 ML
 numpy>=1.24.0
