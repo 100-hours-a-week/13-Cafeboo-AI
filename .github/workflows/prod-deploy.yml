@@ -2,7 +2,7 @@ name: Deploy AI to PROD MIG
 
 on:
   push:
-    branches: [ test2 ]
+    branches: [ main ]
 
 jobs:
   # === 1. Docker Build 및 GCR Push ===

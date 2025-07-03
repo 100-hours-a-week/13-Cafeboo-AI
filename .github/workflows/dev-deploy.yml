@@ -2,7 +2,7 @@ name: Deploy to GCP Private VM
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ test2 ]
 
 env:
   PROJECT_ID: master-isotope-462503-m9
