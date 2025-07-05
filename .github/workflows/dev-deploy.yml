@@ -5,7 +5,7 @@ on:
     branches: [ test2 ]
 
 env:
-  PROJECT_ID: master-isotope-462503-m9
+  PROJECT_ID: true-alliance-464905-t8
   REGION: asia-northeast3
   IMAGE_NAME: cafeboo-ai
 

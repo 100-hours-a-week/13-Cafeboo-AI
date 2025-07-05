@@ -2,16 +2,16 @@ name: Deploy AI to PROD MIG
 
 on:
   push:
-    branches: [ main ]
+    branches: [ test2 ]
 
 jobs:
   # === 1. Docker Build 및 GCR Push ===
   build:
     runs-on: ubuntu-latest
     env:
-      PROJECT_ID: master-isotope-462503-m9
+      PROJECT_ID: true-alliance-464905-t8
       REGION: asia-northeast3
-      IMAGE: asia-northeast3-docker.pkg.dev/master-isotope-462503-m9/ai/cafeboo-ai
+      IMAGE: asia-northeast3-docker.pkg.dev/true-alliance-464905-t8/ai/cafeboo-ai
       LOKI_VM_IP: ${{ secrets.LOKI_VM_IP }}
 
     steps:
@@ -65,9 +65,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     env:
-      PROJECT_ID: master-isotope-462503-m9
+      PROJECT_ID: true-alliance-464905-t8
       REGION: asia-northeast3
-      IMAGE: asia-northeast3-docker.pkg.dev/master-isotope-462503-m9/ai/cafeboo-ai
+      IMAGE: asia-northeast3-docker.pkg.dev/true-alliance-464905-t8/ai/cafeboo-ai
 
     steps:
       - name: Authenticate to Google Cloud
@@ -170,7 +170,7 @@ jobs:
             --boot-disk-type=pd-balanced \
             --image-family=ubuntu-2204-lts \
             --image-project=ubuntu-os-cloud \
-            --service-account=terraform@master-isotope-462503-m9.iam.gserviceaccount.com \
+            --service-account=terraform@true-alliance-464905-t8.iam.gserviceaccount.com \
             --scopes=https://www.googleapis.com/auth/cloud-platform
 
       # MIG Rolling Update 수행
