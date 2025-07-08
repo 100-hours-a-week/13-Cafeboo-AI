@@ -2,7 +2,7 @@ name: Deploy to GCP Private VM
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ dsd ]
 
 env:
   PROJECT_ID: true-alliance-464905-t8
