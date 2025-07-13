@@ -5,7 +5,7 @@ on:
     branches: [ dev ]
 
 env:
-  PROJECT_ID: true-alliance-464905-t8
+  PROJECT_ID: cafeboo-459107
   REGION: asia-northeast3
   IMAGE_NAME: cafeboo-ai
 
