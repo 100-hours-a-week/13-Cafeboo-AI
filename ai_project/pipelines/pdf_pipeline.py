@@ -1,6 +1,6 @@
 from typing import Dict
 import torch
-from langgraph.graph import Graph
+from langgraph.graph import StateGraph as Graph
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
