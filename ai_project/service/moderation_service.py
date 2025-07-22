@@ -1,9 +1,9 @@
-from ai_project.service.moderation_model_loader import moderation_model
+from ai_project.service.moderation_model_loader_v2 import moderation_model
 from fastapi import HTTPException
 class ModerationService:
     def moderate(selt, user_input: str) -> dict:
         try:
-            pred = moderation_model.predict(user_input)
+            pred = moderation_model.ensemble_check_moderation_onnx(user_input)
             if pred == 1:
                 return {"is_toxic": pred, "message": "유해하지 않은 문장입니다."}
             else:

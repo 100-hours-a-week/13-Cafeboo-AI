@@ -17,7 +17,8 @@ WORKDIR /app/ai_project/models
 RUN curl -L -o embedding_model.tar.gz https://storage.googleapis.com/ai_model_cafeboo/embedding_model.tar.gz \
  && tar -xzf embedding_model.tar.gz \
  && rm embedding_model.tar.gz \
- && curl -L -o best_model.pt https://storage.googleapis.com/ai_model_cafeboo/moderation_model/best_model.pt
+ && curl -L -o ELECTRA.quant.onnx https://storage.googleapis.com/ai_model_cafeboo/moderation_model/ELECTRA.quant.onnx \
+ && curl -L -o roberta.quant.onnx https://storage.googleapis.com/ai_model_cafeboo/moderation_model/roberta.quant.onnx
 
 # 4. Final: 최종 이미지 - 실행에 필요한 것만 복사
 FROM models AS final
